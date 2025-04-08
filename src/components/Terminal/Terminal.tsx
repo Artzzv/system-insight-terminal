@@ -5,6 +5,7 @@ import TerminalHeader from './TerminalHeader';
 import TerminalOutput, { TerminalOutputLine, OutputType } from './TerminalOutput';
 import TerminalInput from './TerminalInput';
 import { executeCommand } from '@/utils/commandHandler';
+import { Separator } from '@/components/ui/separator';
 
 interface TerminalProps {
   title?: string;
@@ -23,18 +24,37 @@ const Terminal: React.FC<TerminalProps> = ({
   const [history, setHistory] = useState<string[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isServerConnected, setIsServerConnected] = useState(false);
+  const [isServerChecking, setIsServerChecking] = useState(true);
 
   const terminalRef = useRef<HTMLDivElement>(null);
 
   // Common commands for autocompletion
   const commonCommands = [
     'help', 'clear', 'network-check', 'system-health', 'audit', 
-    'show-policies', 'analyze-logs', 'exit', 'ls', 'cd', 'pwd',
-    'ifconfig', 'ping', 'traceroute', 'netstat', 'arp',
+    'show-policies', 'analyze-logs', 'ai-analyze-logs', 'exit', 'ls', 'cd', 'pwd',
+    'ifconfig', 'ipconfig', 'ping', 'traceroute', 'netstat', 'arp',
     'ps', 'top', 'htop', 'df', 'du', 'free',
     'cat', 'grep', 'find', 'chmod', 'chown', 'history'
   ];
 
+  // Check if backend server is running
+  useEffect(() => {
+    const checkServerConnection = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/health');
+        setIsServerConnected(response.ok);
+      } catch (error) {
+        setIsServerConnected(false);
+      } finally {
+        setIsServerChecking(false);
+      }
+    };
+
+    checkServerConnection();
+  }, []);
+
+  // Auto-scroll to bottom when output changes
   useEffect(() => {
     if (terminalRef.current) {
       terminalRef.current.scrollTop = terminalRef.current.scrollHeight;
@@ -61,6 +81,30 @@ const Terminal: React.FC<TerminalProps> = ({
     setIsProcessing(true);
 
     try {
+      // If server is not connected, show a warning message for commands that need the backend
+      if (!isServerConnected && !['help', 'clear', 'exit'].includes(command.trim().toLowerCase())) {
+        addOutputLine(
+          <div className="space-y-2">
+            <p className="text-terminal-warning">Backend server not connected!</p>
+            <p>The backend server appears to be offline. Some commands will not function properly.</p>
+            <p>Please make sure the Flask backend server is running:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-4">
+              <li>Navigate to the backend directory</li>
+              <li>Install dependencies: <code>pip install flask flask_cors psutil netifaces cryptography</code></li>
+              <li>Run the server: <code>python app.py</code></li>
+            </ol>
+            <p>Only basic commands like 'help', 'clear', and 'exit' will work without the backend.</p>
+          </div>,
+          'warning'
+        );
+        
+        if (command.trim() !== 'help' && command.trim() !== 'clear' && command.trim() !== 'exit') {
+          setIsProcessing(false);
+          setInput('');
+          return;
+        }
+      }
+      
       // Process the command
       const result = await executeCommand(command);
       
@@ -118,11 +162,33 @@ const Terminal: React.FC<TerminalProps> = ({
   // Start with welcome message
   useEffect(() => {
     if (outputLines.length === 0) {
-      addOutputLine(`Welcome to System Insight Terminal v1.0.0`, 'info');
+      addOutputLine(`Welcome to System Insight Terminal v1.1.0`, 'info');
       addOutputLine(`Type 'help' to see available commands`, 'info');
+      
+      if (isServerChecking) {
+        addOutputLine('Checking connection to backend server...', 'standard');
+      } else if (!isServerConnected) {
+        addOutputLine(
+          <div className="space-y-2">
+            <p className="text-terminal-warning">Backend server not connected!</p>
+            <p>To enable full functionality, please start the backend server:</p>
+            <ol className="list-decimal list-inside space-y-1 ml-4">
+              <li>Navigate to the backend directory</li>
+              <li>Install dependencies: <code>pip install flask flask_cors psutil netifaces cryptography</code></li>
+              <li>Run the server: <code>python app.py</code></li>
+            </ol>
+            <p>Only basic commands like 'help', 'clear', and 'exit' will work without the backend.</p>
+          </div>,
+          'warning'
+        );
+      } else {
+        addOutputLine('Connected to backend server successfully!', 'success');
+        addOutputLine(`Real-time system monitoring is now available.`, 'success');
+      }
+      
       addOutputLine('', 'standard');
     }
-  }, []);
+  }, [outputLines.length, isServerConnected, isServerChecking]);
 
   return (
     <div className="flex flex-col h-full border border-border rounded-md overflow-hidden bg-terminal-dark shadow-lg">
@@ -145,6 +211,20 @@ const Terminal: React.FC<TerminalProps> = ({
           />
         </div>
       </div>
+      
+      {!isServerConnected && !isServerChecking && (
+        <div className="p-2 bg-terminal-error/20 border-t border-terminal-error">
+          <div className="text-xs text-terminal-error flex items-center justify-between">
+            <span>Backend server not connected. Limited functionality available.</span>
+            <button 
+              className="px-2 py-1 bg-terminal-dark text-xs rounded border border-terminal-error hover:bg-terminal-error/20"
+              onClick={() => window.location.reload()}
+            >
+              Retry Connection
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

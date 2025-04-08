@@ -17,21 +17,21 @@ const TerminalHeader: React.FC<TerminalHeaderProps> = ({
   onClose,
 }) => {
   return (
-    <div className="terminal-header">
-      <div className="flex space-x-2 mr-4">
-        <Circle className="h-3 w-3 text-terminal-error cursor-pointer" onClick={onClose} />
-        <Circle className="h-3 w-3 text-terminal-warning cursor-pointer" onClick={onMinimize} />
-        <Circle className="h-3 w-3 text-terminal-success cursor-pointer" onClick={onMaximize} />
+    <div className="terminal-header bg-terminal-dark border-b border-border flex items-center justify-between px-4 py-2">
+      <div className="flex space-x-2">
+        <Circle className="h-3 w-3 text-terminal-error cursor-pointer hover:brightness-125 transition-all" onClick={onClose} />
+        <Circle className="h-3 w-3 text-terminal-warning cursor-pointer hover:brightness-125 transition-all" onClick={onMinimize} />
+        <Circle className="h-3 w-3 text-terminal-success cursor-pointer hover:brightness-125 transition-all" onClick={onMaximize} />
       </div>
       <div className="flex-1 text-center text-sm font-medium">{title}</div>
       <div className="flex space-x-2">
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMinimize}>
+        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-50 hover:opacity-100" onClick={onMinimize}>
           <Minus className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onMaximize}>
+        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-50 hover:opacity-100" onClick={onMaximize}>
           <Maximize2 className="h-3 w-3" />
         </Button>
-        <Button variant="ghost" size="icon" className="h-6 w-6" onClick={onClose}>
+        <Button variant="ghost" size="icon" className="h-6 w-6 opacity-50 hover:opacity-100" onClick={onClose}>
           <X className="h-3 w-3" />
         </Button>
       </div>

@@ -2,45 +2,56 @@
 import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
 
 interface CommandResult {
   content: React.ReactNode;
   type: 'standard' | 'success' | 'error' | 'warning' | 'info' | 'jsx';
 }
 
-// Simulated network check results
-const networkDevices = [
-  { name: 'eth0', status: 'connected', ip: '192.168.1.100', mac: '00:1A:2B:3C:4D:5E' },
-  { name: 'wlan0', status: 'connected', ip: '192.168.1.101', mac: '00:1A:2B:3C:4D:5F' },
-  { name: 'lo', status: 'connected', ip: '127.0.0.1', mac: '00:00:00:00:00:00' },
-];
+// API endpoint URL - Update this to your actual backend URL
+const API_URL = 'http://localhost:5000/api';
 
-// Simulated system health
-const systemHealth = {
-  cpu: { usage: 45, temp: 65, cores: 8 },
-  memory: { total: 16384, used: 8192, free: 8192 },
-  disk: { total: 512, used: 256, free: 256 },
-  uptime: '5 days, 7 hours, 23 minutes',
-  processes: 143,
+// Helper function to fetch data from the API
+const fetchFromApi = async (endpoint: string) => {
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`);
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error fetching from ${endpoint}:`, error);
+    throw error;
+  }
 };
 
-// Simulated security policies
-const securityPolicies = [
-  { id: 'POL001', name: 'Password Policy', status: 'Enforced', lastUpdated: '2023-12-15' },
-  { id: 'POL002', name: 'Firewall Rules', status: 'Enforced', lastUpdated: '2024-01-20' },
-  { id: 'POL003', name: 'Access Control', status: 'Partially Enforced', lastUpdated: '2024-03-10' },
-  { id: 'POL004', name: 'Data Encryption', status: 'Enforced', lastUpdated: '2024-02-28' },
-  { id: 'POL005', name: 'Audit Logging', status: 'Enforced', lastUpdated: '2024-04-01' },
-];
+// Helper function to post data to the API
+const postToApi = async (endpoint: string, data: any) => {
+  try {
+    const response = await fetch(`${API_URL}${endpoint}`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(data),
+    });
+    if (!response.ok) {
+      throw new Error(`API error: ${response.status}`);
+    }
+    return await response.json();
+  } catch (error) {
+    console.error(`Error posting to ${endpoint}:`, error);
+    throw error;
+  }
+};
 
-// Simulated log entries
-const logEntries = [
-  { timestamp: '2024-04-08 10:15:23', level: 'INFO', service: 'Authentication', message: 'User login successful: admin' },
-  { timestamp: '2024-04-08 10:16:45', level: 'WARNING', service: 'Firewall', message: 'Blocked connection attempt from 203.0.113.42:4455' },
-  { timestamp: '2024-04-08 10:18:12', level: 'ERROR', service: 'Database', message: 'Connection timeout after 30s' },
-  { timestamp: '2024-04-08 10:20:30', level: 'INFO', service: 'FileSystem', message: 'Backup completed successfully' },
-  { timestamp: '2024-04-08 10:22:15', level: 'WARNING', service: 'Authentication', message: 'Failed login attempt for user: guest' },
-];
+// Colors for charts
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658'];
+const ERROR_COLOR = '#FF4842';
+const WARNING_COLOR = '#FFC107';
+const INFO_COLOR = '#2196F3';
+const SUCCESS_COLOR = '#4CAF50';
 
 // Help information
 const helpInfo = `
@@ -52,9 +63,9 @@ Basic Commands:
   exit                Exit the terminal session
 
 System Commands:
-  system-health       Display system health metrics
+  system-health       Display real-time system health metrics
   ps                  List running processes
-  top                 Display system resource usage (interactive)
+  top                 Display system resource usage
   df                  Show disk space usage
   free                Display memory usage
 
@@ -66,11 +77,18 @@ Network Commands:
   traceroute <host>   Trace the route to a host
 
 Security Commands:
-  audit               Run a security audit
-  show-policies       Display security policies
-  analyze-logs        Analyze system logs
+  audit               Run a real-time security audit
+  show-policies       Display actual security policies
+  analyze-logs        Analyze system logs (supports different log files)
+  ai-analyze-logs     Use AI/ML to analyze logs and detect anomalies
   scan-ports          Scan for open ports
   check-updates       Check for security updates
+
+Log Analysis:
+  analyze-logs [path] Analyze system logs (default: syslog/System)
+  analyze-logs Auth   Analyze authentication logs
+  analyze-logs Security Analyze security logs (Windows)
+  analyze-logs Application Analyze application logs (Windows)
 
 File Operations:
   ls [dir]            List directory contents
@@ -83,405 +101,847 @@ Type any command to execute it.
 `;
 
 export async function executeCommand(command: string): Promise<CommandResult> {
-  // Simulate command execution delay
-  await new Promise(resolve => setTimeout(resolve, Math.random() * 500 + 200));
-  
   const parts = command.trim().split(' ');
   const mainCommand = parts[0].toLowerCase();
   const args = parts.slice(1);
   
-  switch (mainCommand) {
-    case 'help':
-      return { content: helpInfo, type: 'info' };
-    
-    case 'network-check':
-      return { 
-        content: (
-          <div className="space-y-2">
-            <p>Performing network check...</p>
-            <div className="space-y-4 mt-2">
-              <p className="font-semibold">Network Interfaces:</p>
-              <table className="min-w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left pr-4">Interface</th>
-                    <th className="text-left pr-4">Status</th>
-                    <th className="text-left pr-4">IP Address</th>
-                    <th className="text-left">MAC Address</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {networkDevices.map((device, index) => (
-                    <tr key={index}>
-                      <td className="pr-4">{device.name}</td>
-                      <td className={`pr-4 ${device.status === 'connected' ? 'text-terminal-success' : 'text-terminal-error'}`}>
-                        {device.status}
-                      </td>
-                      <td className="pr-4">{device.ip}</td>
-                      <td>{device.mac}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              
-              <p className="font-semibold mt-4">Connectivity Tests:</p>
+  try {
+    switch (mainCommand) {
+      case 'help':
+        return { content: helpInfo, type: 'info' };
+      
+      case 'network-check':
+        // Fetch real network data from our API
+        try {
+          const networkData = await fetchFromApi('/system/network');
+          
+          return { 
+            content: (
               <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span>Default Gateway (192.168.1.1):</span>
-                  <span className="text-terminal-success">Connected (2ms)</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>DNS Server (8.8.8.8):</span>
-                  <span className="text-terminal-success">Connected (45ms)</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span>Internet (google.com):</span>
-                  <span className="text-terminal-success">Connected (78ms)</span>
-                </div>
-              </div>
-              
-              <p className="text-terminal-success font-semibold mt-2">
-                Network check completed successfully. All systems operational.
-              </p>
-            </div>
-          </div>
-        ),
-        type: 'jsx'
-      };
-    
-    case 'system-health':
-      return {
-        content: (
-          <div className="space-y-4">
-            <p>System Health Report:</p>
-            
-            <div className="space-y-2">
-              <p className="font-semibold">CPU:</p>
-              <div className="flex items-center space-x-2">
-                <div className="flex-1">
-                  <Progress value={systemHealth.cpu.usage} className="h-2" />
-                </div>
-                <span>{systemHealth.cpu.usage}%</span>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-sm">
-                <div>Temperature: <span className={systemHealth.cpu.temp > 80 ? 'text-terminal-error' : 'text-terminal-success'}>
-                  {systemHealth.cpu.temp}°C
-                </span></div>
-                <div>Cores: {systemHealth.cpu.cores}</div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="font-semibold">Memory:</p>
-              <div className="flex items-center space-x-2">
-                <div className="flex-1">
-                  <Progress value={(systemHealth.memory.used / systemHealth.memory.total) * 100} className="h-2" />
-                </div>
-                <span>{Math.round((systemHealth.memory.used / systemHealth.memory.total) * 100)}%</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div>Total: {systemHealth.memory.total} MB</div>
-                <div>Used: {systemHealth.memory.used} MB</div>
-                <div>Free: {systemHealth.memory.free} MB</div>
-              </div>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="font-semibold">Disk Space:</p>
-              <div className="flex items-center space-x-2">
-                <div className="flex-1">
-                  <Progress value={(systemHealth.disk.used / systemHealth.disk.total) * 100} className="h-2" />
-                </div>
-                <span>{Math.round((systemHealth.disk.used / systemHealth.disk.total) * 100)}%</span>
-              </div>
-              <div className="grid grid-cols-3 gap-2 text-sm">
-                <div>Total: {systemHealth.disk.total} GB</div>
-                <div>Used: {systemHealth.disk.used} GB</div>
-                <div>Free: {systemHealth.disk.free} GB</div>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 text-sm mt-2">
-              <div>
-                <span className="font-semibold">System Uptime:</span> {systemHealth.uptime}
-              </div>
-              <div>
-                <span className="font-semibold">Processes:</span> {systemHealth.processes}
-              </div>
-            </div>
-            
-            <p className="text-terminal-success font-semibold mt-2">
-              System health check completed. Overall status: Good
-            </p>
-          </div>
-        ),
-        type: 'jsx'
-      };
-    
-    case 'audit':
-      return {
-        content: (
-          <div className="space-y-4">
-            <p>Running security audit...</p>
-            
-            <div className="space-y-2">
-              <div className="flex justify-between">
-                <span>Checking user permissions...</span>
-                <span className="text-terminal-success">Passed</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Verifying file permissions...</span>
-                <span className="text-terminal-warning">Warnings found</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Scanning for vulnerable software...</span>
-                <span className="text-terminal-error">Issues found</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Checking firewall configuration...</span>
-                <span className="text-terminal-success">Passed</span>
-              </div>
-              <div className="flex justify-between">
-                <span>Auditing password policies...</span>
-                <span className="text-terminal-success">Passed</span>
-              </div>
-            </div>
-            
-            <Separator />
-            
-            <div>
-              <p className="font-semibold">Issues found:</p>
-              <ul className="list-disc list-inside space-y-1 mt-1">
-                <li className="text-terminal-warning">
-                  /etc/shadow has incorrect permissions (644, should be 600)
-                </li>
-                <li className="text-terminal-error">
-                  OpenSSL version 1.1.1 is vulnerable (CVE-2023-0286)
-                </li>
-                <li className="text-terminal-error">
-                  Apache httpd 2.4.49 is vulnerable (CVE-2021-41773)
-                </li>
-              </ul>
-            </div>
-            
-            <div>
-              <p className="font-semibold">Recommendations:</p>
-              <ul className="list-disc list-inside space-y-1 mt-1">
-                <li>Update OpenSSL to version 1.1.1t or later</li>
-                <li>Update Apache httpd to version 2.4.53 or later</li>
-                <li>Fix file permissions: chmod 600 /etc/shadow</li>
-              </ul>
-            </div>
-            
-            <p className="text-terminal-warning font-semibold mt-2">
-              Audit completed with 1 warning and 2 critical issues.
-            </p>
-          </div>
-        ),
-        type: 'jsx'
-      };
-    
-    case 'show-policies':
-      return {
-        content: (
-          <div className="space-y-4">
-            <p>Security Policies:</p>
-            
-            <div className="space-y-2">
-              <table className="min-w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left pr-4">ID</th>
-                    <th className="text-left pr-4">Policy</th>
-                    <th className="text-left pr-4">Status</th>
-                    <th className="text-left">Last Updated</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {securityPolicies.map((policy, index) => (
-                    <tr key={index}>
-                      <td className="pr-4">{policy.id}</td>
-                      <td className="pr-4">{policy.name}</td>
-                      <td className={`pr-4 ${
-                        policy.status === 'Enforced' 
-                          ? 'text-terminal-success' 
-                          : policy.status === 'Partially Enforced' 
-                            ? 'text-terminal-warning' 
-                            : 'text-terminal-error'
-                      }`}>
-                        {policy.status}
-                      </td>
-                      <td>{policy.lastUpdated}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            <p className="mt-2">
-              To view details of a specific policy, use: <span className="text-terminal-command">show-policies --detail POL001</span>
-            </p>
-          </div>
-        ),
-        type: 'jsx'
-      };
-    
-    case 'analyze-logs':
-      return {
-        content: (
-          <div className="space-y-4">
-            <p>Log Analysis:</p>
-            
-            <div className="space-y-2">
-              <table className="min-w-full">
-                <thead>
-                  <tr>
-                    <th className="text-left pr-4">Timestamp</th>
-                    <th className="text-left pr-4">Level</th>
-                    <th className="text-left pr-4">Service</th>
-                    <th className="text-left">Message</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {logEntries.map((log, index) => (
-                    <tr key={index}>
-                      <td className="pr-4 text-xs">{log.timestamp}</td>
-                      <td className={`pr-4 ${
-                        log.level === 'ERROR' 
-                          ? 'text-terminal-error' 
-                          : log.level === 'WARNING' 
-                            ? 'text-terminal-warning' 
-                            : 'text-terminal-info'
-                      }`}>
-                        {log.level}
-                      </td>
-                      <td className="pr-4">{log.service}</td>
-                      <td>{log.message}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            
-            <div className="space-y-2">
-              <p className="font-semibold">Summary:</p>
-              <div className="grid grid-cols-3 gap-2">
-                <div className="bg-secondary p-2 rounded flex flex-col items-center">
-                  <span className="text-terminal-info font-bold text-lg">2</span>
-                  <span className="text-xs">INFO</span>
-                </div>
-                <div className="bg-secondary p-2 rounded flex flex-col items-center">
-                  <span className="text-terminal-warning font-bold text-lg">2</span>
-                  <span className="text-xs">WARNING</span>
-                </div>
-                <div className="bg-secondary p-2 rounded flex flex-col items-center">
-                  <span className="text-terminal-error font-bold text-lg">1</span>
-                  <span className="text-xs">ERROR</span>
+                <p>Performing real-time network check...</p>
+                <div className="space-y-4 mt-2">
+                  <p className="font-semibold">Network Interfaces:</p>
+                  <table className="min-w-full">
+                    <thead>
+                      <tr>
+                        <th className="text-left pr-4">Interface</th>
+                        <th className="text-left pr-4">Status</th>
+                        <th className="text-left pr-4">IP Address</th>
+                        <th className="text-left">MAC Address</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {Object.entries(networkData.interfaces).map(([name, info]: [string, any]) => (
+                        <tr key={name}>
+                          <td className="pr-4">{name}</td>
+                          <td className="pr-4 text-terminal-success">connected</td>
+                          <td className="pr-4">{info.ip}</td>
+                          <td>{info.mac}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  
+                  <p className="font-semibold mt-4">Network Statistics:</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                      <span>Bytes Sent:</span>
+                      <span>{networkData.io_counters.bytes_sent.toLocaleString()} bytes</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Bytes Received:</span>
+                      <span>{networkData.io_counters.bytes_received.toLocaleString()} bytes</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Packets Sent:</span>
+                      <span>{networkData.io_counters.packets_sent.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span>Packets Received:</span>
+                      <span>{networkData.io_counters.packets_received.toLocaleString()}</span>
+                    </div>
+                  </div>
+                  
+                  <p className="font-semibold mt-4">Active Connections:</p>
+                  <div className="max-h-40 overflow-y-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left pr-4">Protocol</th>
+                          <th className="text-left pr-4">Local Address</th>
+                          <th className="text-left pr-4">Remote Address</th>
+                          <th className="text-left">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {networkData.connections.slice(0, 10).map((conn: any, index: number) => (
+                          <tr key={index}>
+                            <td className="pr-4">{conn.type}</td>
+                            <td className="pr-4">{conn.local_address || '-'}</td>
+                            <td className="pr-4">{conn.remote_address || '-'}</td>
+                            <td>{conn.status}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {networkData.connections.length > 10 && (
+                      <p className="text-xs text-terminal-info mt-2">
+                        Showing 10 of {networkData.connections.length} connections
+                      </p>
+                    )}
+                  </div>
+                  
+                  <p className="text-terminal-success font-semibold mt-2">
+                    Network check completed successfully.
+                  </p>
                 </div>
               </div>
-            </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error retrieving network information: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'system-health':
+        try {
+          // Fetch real system data from our API
+          const cpuData = await fetchFromApi('/system/cpu');
+          const memoryData = await fetchFromApi('/system/memory');
+          const diskData = await fetchFromApi('/system/disk');
+          const systemData = await fetchFromApi('/system/info');
+          
+          // Calculate uptime
+          const bootTime = new Date(systemData.boot_time);
+          const now = new Date();
+          const uptimeMs = now.getTime() - bootTime.getTime();
+          const uptimeDays = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
+          const uptimeHours = Math.floor((uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+          const uptimeMinutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+          const uptime = `${uptimeDays} days, ${uptimeHours} hours, ${uptimeMinutes} minutes`;
+          
+          // Format disk and memory sizes to GB
+          const formatBytes = (bytes: number, decimals = 2) => {
+            if (bytes === 0) return '0 Bytes';
+            const k = 1024;
+            const dm = decimals < 0 ? 0 : decimals;
+            const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+          };
+          
+          // Create chart data for CPU usage
+          const cpuChartData = cpuData.cpu_usage_per_core.map((usage: number, index: number) => ({
+            name: `Core ${index + 1}`,
+            usage
+          }));
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p>Real-time System Health Report for {systemData.hostname}:</p>
+                
+                <div className="space-y-2">
+                  <p className="font-semibold">CPU Usage:</p>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <Progress value={cpuData.total_cpu_usage} className="h-2" />
+                    </div>
+                    <span>{cpuData.total_cpu_usage.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={cpuChartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="name" />
+                        <YAxis domain={[0, 100]} />
+                        <Tooltip />
+                        <Bar dataKey="usage" fill="#8884d8" />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    <div>Physical Cores: {cpuData.physical_cores}</div>
+                    <div>Logical Cores: {cpuData.total_cores}</div>
+                    {cpuData.cpu_frequency.current && (
+                      <div>CPU Frequency: {cpuData.cpu_frequency.current.toFixed(0)} MHz</div>
+                    )}
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="font-semibold">Memory:</p>
+                  <div className="flex items-center space-x-2">
+                    <div className="flex-1">
+                      <Progress value={memoryData.virtual_memory.percentage} className="h-2" />
+                    </div>
+                    <span>{memoryData.virtual_memory.percentage.toFixed(1)}%</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-sm">
+                    <div>Total: {formatBytes(memoryData.virtual_memory.total)}</div>
+                    <div>Used: {formatBytes(memoryData.virtual_memory.used)}</div>
+                    <div>Available: {formatBytes(memoryData.virtual_memory.available)}</div>
+                  </div>
+                </div>
+                
+                <div className="space-y-2">
+                  <p className="font-semibold">Disk Space:</p>
+                  <div className="grid gap-2">
+                    {diskData.partitions.map((partition: any, index: number) => (
+                      <div key={index} className="space-y-1">
+                        <div className="flex justify-between text-xs">
+                          <span>{partition.mountpoint} ({partition.device})</span>
+                          <span>{partition.percentage.toFixed(1)}% used</span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <div className="flex-1">
+                            <Progress value={partition.percentage} className="h-2" />
+                          </div>
+                        </div>
+                        <div className="text-xs grid grid-cols-3 gap-1">
+                          <div>Total: {formatBytes(partition.total_size)}</div>
+                          <div>Used: {formatBytes(partition.used)}</div>
+                          <div>Free: {formatBytes(partition.free)}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4 text-sm mt-2">
+                  <div>
+                    <span className="font-semibold">System Uptime:</span> {uptime}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Platform:</span> {systemData.platform}
+                  </div>
+                </div>
+                
+                <p className="text-terminal-success font-semibold mt-2">
+                  System health check completed. {memoryData.virtual_memory.percentage > 90 || cpuData.total_cpu_usage > 90 ? "Warning: High resource usage detected." : "All systems normal."}
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error retrieving system health information: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'audit':
+        try {
+          // Fetch real audit data from our API
+          const auditData = await fetchFromApi('/security/audit');
+          
+          // Create pie chart data for issues by severity
+          const severityData = [
+            { name: 'High', value: auditData.issues_by_severity.high, color: ERROR_COLOR },
+            { name: 'Medium', value: auditData.issues_by_severity.medium, color: WARNING_COLOR },
+            { name: 'Low', value: auditData.issues_by_severity.low, color: INFO_COLOR }
+          ].filter(item => item.value > 0);
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p>Running real-time security audit for {auditData.hostname}...</p>
+                
+                {severityData.length > 0 && (
+                  <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={severityData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={60}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}`}
+                        >
+                          {severityData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                
+                {auditData.issues.length > 0 && (
+                  <>
+                    <Separator />
+                    
+                    <div>
+                      <p className="font-semibold">Issues found:</p>
+                      <ul className="list-disc list-inside space-y-1 mt-1">
+                        {auditData.issues.map((issue: any, index: number) => (
+                          <li key={index} className={
+                            issue.severity === 'high' ? 'text-terminal-error' : 
+                            issue.severity === 'medium' ? 'text-terminal-warning' : 
+                            'text-terminal-info'
+                          }>
+                            {issue.issue}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    
+                    <div>
+                      <p className="font-semibold">Recommendations:</p>
+                      <ul className="list-disc list-inside space-y-1 mt-1">
+                        {auditData.issues.map((issue: any, index: number) => (
+                          <li key={index}>
+                            {issue.recommendation}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </>
+                )}
+                
+                {auditData.issues.length === 0 && (
+                  <p className="text-terminal-success">
+                    No security issues found. Your system is properly configured.
+                  </p>
+                )}
+                
+                <p className={
+                  auditData.issues_by_severity.high > 0 ? 'text-terminal-error font-semibold mt-2' :
+                  auditData.issues_by_severity.medium > 0 ? 'text-terminal-warning font-semibold mt-2' :
+                  'text-terminal-success font-semibold mt-2'
+                }>
+                  Audit completed with {auditData.issues_by_severity.high} critical, {auditData.issues_by_severity.medium} warning, and {auditData.issues_by_severity.low} informational issues.
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error performing security audit: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'show-policies':
+        try {
+          // Fetch real policy data from our API
+          const policiesData = await fetchFromApi('/security/policies');
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p>Real Security Policies:</p>
+                
+                {/* Password Policy */}
+                <div className="space-y-2">
+                  <p className="font-semibold">Password Policy:</p>
+                  <table className="min-w-full">
+                    <tbody>
+                      <tr>
+                        <td className="pr-4">Minimum Length:</td>
+                        <td>{policiesData.password_policy.min_length ?? 'Not configured'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Require Uppercase:</td>
+                        <td>{policiesData.password_policy.require_uppercase ? 'Yes' : 'No'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Require Lowercase:</td>
+                        <td>{policiesData.password_policy.require_lowercase ? 'Yes' : 'No'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Require Numbers:</td>
+                        <td>{policiesData.password_policy.require_numbers ? 'Yes' : 'No'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Require Special Characters:</td>
+                        <td>{policiesData.password_policy.require_special_chars ? 'Yes' : 'No'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Maximum Age (days):</td>
+                        <td>{policiesData.password_policy.max_age_days ?? 'Not configured'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Prevent Password Reuse:</td>
+                        <td>{policiesData.password_policy.prevent_reuse ? 'Yes' : 'No'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Account Lockout Threshold:</td>
+                        <td>{policiesData.password_policy.lockout_threshold ?? 'Not configured'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                {/* Firewall Rules */}
+                <div className="space-y-2">
+                  <p className="font-semibold">Firewall Rules:</p>
+                  <table className="min-w-full">
+                    <tbody>
+                      <tr>
+                        <td className="pr-4">Default Incoming Policy:</td>
+                        <td className={policiesData.firewall_rules.default_incoming === 'deny' ? 'text-terminal-success' : 'text-terminal-warning'}>
+                          {policiesData.firewall_rules.default_incoming ?? 'Not configured'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Default Outgoing Policy:</td>
+                        <td>{policiesData.firewall_rules.default_outgoing ?? 'Not configured'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Allowed Services:</td>
+                        <td>{policiesData.firewall_rules.allowed_services.length > 0 ? 
+                          policiesData.firewall_rules.allowed_services.join(', ') : 
+                          'None detected'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <p className="mt-2">
+                  To view details of additional policies, use: <span className="text-terminal-command">show-policies --detail access_control</span>
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error retrieving security policies: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'analyze-logs':
+        try {
+          // Determine which log path to analyze
+          let logPath = 'System'; // Default
+          if (args.length > 0) {
+            logPath = args[0];
+          }
+          
+          // Fetch real log data from our API
+          const logsData = await fetchFromApi(`/logs/analyze?path=${logPath}&limit=100`);
+          
+          // Create chart data for log levels
+          const levelData = [
+            { name: 'Info', value: logsData.levels.info, color: INFO_COLOR },
+            { name: 'Warning', value: logsData.levels.warning, color: WARNING_COLOR },
+            { name: 'Error', value: logsData.levels.error, color: ERROR_COLOR },
+            { name: 'Critical', value: logsData.levels.critical, color: '#9c27b0' }
+          ].filter(item => item.value > 0);
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p>Log Analysis for {logPath}:</p>
+                
+                {/* Log level distribution chart */}
+                {levelData.length > 0 && (
+                  <div className="h-40 w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={levelData}
+                          cx="50%"
+                          cy="50%"
+                          outerRadius={60}
+                          dataKey="value"
+                          label={({ name, value }) => `${name}: ${value}`}
+                        >
+                          {levelData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+                
+                {/* Most active services */}
+                {Object.keys(logsData.services).length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Most Active Services:</p>
+                    <div className="max-h-24 overflow-y-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr>
+                            <th className="text-left pr-4">Service</th>
+                            <th className="text-left">Count</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Object.entries(logsData.services)
+                            .sort((a: any, b: any) => b[1] - a[1])
+                            .slice(0, 5)
+                            .map(([service, count]: [string, any], index: number) => (
+                              <tr key={index}>
+                                <td className="pr-4">{service}</td>
+                                <td>{count}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Time based pattern */}
+                {logsData.time_series && logsData.time_series.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Event Frequency:</p>
+                    <div className="h-40 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={logsData.time_series}>
+                          <XAxis dataKey="time" />
+                          <YAxis />
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <Tooltip />
+                          <Line type="monotone" dataKey="count" stroke="#8884d8" />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Log entries table */}
+                <div className="space-y-2">
+                  <p className="font-semibold">Recent Log Entries:</p>
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left pr-4">Timestamp</th>
+                          <th className="text-left pr-4">Level</th>
+                          <th className="text-left pr-4">Service</th>
+                          <th className="text-left">Message</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logsData.entries.map((log: any, index: number) => (
+                          <tr key={index}>
+                            <td className="pr-4 text-xs">{log.timestamp}</td>
+                            <td className={`pr-4 ${
+                              log.level === 'ERROR' || log.level === 'CRITICAL' ? 'text-terminal-error' : 
+                              log.level === 'WARNING' ? 'text-terminal-warning' : 'text-terminal-info'
+                            }`}>
+                              {log.level}
+                            </td>
+                            <td className="pr-4">{log.service}</td>
+                            <td className="truncate max-w-xs">{log.message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+                
+                {/* Most common patterns */}
+                {logsData.patterns && logsData.patterns.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Common Patterns:</p>
+                    <ul className="list-disc list-inside">
+                      {logsData.patterns.map((pattern: any, index: number) => (
+                        <li key={index}>{pattern[0]} ({pattern[1]} occurrences)</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+                
+                <p className="mt-2">
+                  For advanced AI-powered analysis, use: <span className="text-terminal-command">ai-analyze-logs {logPath}</span>
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error analyzing logs: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'ai-analyze-logs':
+        try {
+          // Determine which log path to analyze
+          let logPath = 'System'; // Default
+          if (args.length > 0) {
+            logPath = args[0];
+          }
+          
+          // Fetch AI analysis data from our API
+          const aiAnalysisData = await fetchFromApi(`/logs/ai-analysis?path=${logPath}&limit=1000`);
+          
+          // Prepare data for visualizations
+          const timeSeriesData = aiAnalysisData.time_series || [];
+          const serviceData = aiAnalysisData.service_distribution || [];
+          
+          // Error clusters
+          const errorClusters = aiAnalysisData.error_clusters || [];
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p>AI-Powered Log Analysis for {logPath}:</p>
+                
+                {/* Summary stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div className="bg-secondary p-4 rounded">
+                    <div className="text-xs text-muted-foreground">Total Logs</div>
+                    <div className="text-2xl font-bold">{aiAnalysisData.summary.total_logs}</div>
+                  </div>
+                  <div className="bg-secondary p-4 rounded">
+                    <div className="text-xs text-muted-foreground">Errors</div>
+                    <div className="text-2xl font-bold text-terminal-error">{aiAnalysisData.summary.error_count}</div>
+                  </div>
+                  <div className="bg-secondary p-4 rounded">
+                    <div className="text-xs text-muted-foreground">Warnings</div>
+                    <div className="text-2xl font-bold text-terminal-warning">{aiAnalysisData.summary.warning_count}</div>
+                  </div>
+                  <div className="bg-secondary p-4 rounded">
+                    <div className="text-xs text-muted-foreground">Anomalies</div>
+                    <div className="text-2xl font-bold text-terminal-info">{aiAnalysisData.summary.anomaly_count}</div>
+                  </div>
+                </div>
+                
+                {/* Time series chart */}
+                {timeSeriesData.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Activity Over Time:</p>
+                    <div className="h-48 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <LineChart data={timeSeriesData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="time" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Line type="monotone" dataKey="total" stroke="#8884d8" />
+                          <Line type="monotone" dataKey="error" stroke={ERROR_COLOR} />
+                          <Line type="monotone" dataKey="warning" stroke={WARNING_COLOR} />
+                        </LineChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Service distribution */}
+                {serviceData.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Service Activity:</p>
+                    <div className="h-48 w-full">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={serviceData.slice(0, 7)}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="name" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="error" fill={ERROR_COLOR} stackId="a" />
+                          <Bar dataKey="warning" fill={WARNING_COLOR} stackId="a" />
+                          <Bar dataKey="info" fill={INFO_COLOR} stackId="a" />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                )}
+                
+                {/* Error clusters */}
+                {errorClusters.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Error Patterns:</p>
+                    <div className="max-h-60 overflow-y-auto space-y-3">
+                      {errorClusters.map((cluster: any, index: number) => (
+                        <div key={index} className="p-3 border border-border rounded-md">
+                          <div className="flex justify-between items-start">
+                            <div className="font-semibold text-terminal-error">{cluster.keywords}</div>
+                            <div className="bg-secondary px-2 py-1 rounded text-xs">{cluster.count} occurrences</div>
+                          </div>
+                          <div className="mt-2 text-xs text-muted-foreground">
+                            <div className="font-semibold">Examples:</div>
+                            <ul className="list-disc list-inside mt-1">
+                              {cluster.examples.map((example: string, exIndex: number) => (
+                                <li key={exIndex} className="truncate">{example}</li>
+                              ))}
+                            </ul>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Anomalies */}
+                {aiAnalysisData.anomalies && aiAnalysisData.anomalies.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Detected Anomalies:</p>
+                    <div className="space-y-2">
+                      {aiAnalysisData.anomalies.map((anomaly: any, index: number) => (
+                        <div key={index} className="bg-secondary p-3 rounded-md border-l-4 border-terminal-error">
+                          <div className="font-semibold">
+                            {anomaly.type === 'error_spike' ? 'Error Rate Spike' : anomaly.type}
+                          </div>
+                          <div className="text-sm">{anomaly.description}</div>
+                          <div className="text-xs text-muted-foreground mt-1">
+                            {anomaly.time ? `Time: ${anomaly.time}` : ''}
+                            {anomaly.deviation ? ` - ${anomaly.deviation}` : ''}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                {/* Top patterns */}
+                {aiAnalysisData.top_patterns && aiAnalysisData.top_patterns.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Common Terms:</p>
+                    <div className="flex flex-wrap gap-2">
+                      {aiAnalysisData.top_patterns.map(([term, count]: [string, number], index: number) => (
+                        <div key={index} className="bg-secondary px-2 py-1 rounded text-xs">
+                          {term} ({count})
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
+                <p className="text-terminal-info font-semibold mt-2">
+                  AI analysis complete. {aiAnalysisData.anomalies?.length ? `${aiAnalysisData.anomalies.length} anomalies detected.` : 'No significant anomalies detected.'}
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error performing AI log analysis: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'ping':
+        if (!args.length) {
+          return { content: 'Usage: ping <hostname>', type: 'error' };
+        }
+        
+        try {
+          // Execute the real ping command via our API
+          const result = await postToApi('/system/exec', { command: `ping ${args[0]} ${process.platform === 'win32' ? '-n 4' : '-c 4'}` });
+          
+          if (result.status === 'success') {
+            return { content: result.output, type: 'standard' };
+          } else {
+            return { content: result.message, type: 'error' };
+          }
+        } catch (error) {
+          return { 
+            content: `Error executing ping command: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'ifconfig':
+      case 'ipconfig':
+        try {
+          // Execute the appropriate command based on the OS
+          const command = process.platform === 'win32' ? 'ipconfig' : 'ifconfig';
+          const result = await postToApi('/system/exec', { command });
+          
+          if (result.status === 'success') {
+            return { content: result.output, type: 'standard' };
+          } else {
+            return { content: result.message, type: 'error' };
+          }
+        } catch (error) {
+          return { 
+            content: `Error executing network command: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'ps':
+        try {
+          // Execute the ps command via our API
+          const command = process.platform === 'win32' ? 'tasklist' : 'ps aux | head -20';
+          const result = await postToApi('/system/exec', { command });
+          
+          if (result.status === 'success') {
+            return { content: result.output, type: 'standard' };
+          } else {
+            return { content: result.message, type: 'error' };
+          }
+        } catch (error) {
+          return { 
+            content: `Error executing ps command: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'ls':
+      case 'dir':
+        try {
+          // Execute the appropriate command based on the OS
+          const path = args.length > 0 ? args[0] : '.';
+          const command = process.platform === 'win32' ? `dir ${path}` : `ls -la ${path}`;
+          const result = await postToApi('/system/exec', { command });
+          
+          if (result.status === 'success') {
+            return { content: result.output, type: 'standard' };
+          } else {
+            return { content: result.message, type: 'error' };
+          }
+        } catch (error) {
+          return { 
+            content: `Error executing directory listing command: ${(error as Error).message}. Make sure the backend server is running.`,
+            type: 'error' 
+          };
+        }
+      
+      case 'clear':
+        return { content: '', type: 'standard' };
+      
+      case 'exit':
+        return { content: 'Goodbye!', type: 'info' };
+      
+      default:
+        if (command.trim() !== '') {
+          // Try to execute the command via our API if it's not recognized
+          try {
+            const result = await postToApi('/system/exec', { command });
             
-            <p className="mt-2">
-              For more detailed analysis, use: <span className="text-terminal-command">analyze-logs --service Authentication</span>
-            </p>
-          </div>
-        ),
-        type: 'jsx'
-      };
-    
-    case 'ping':
-      if (!args.length) {
-        return { content: 'Usage: ping <hostname>', type: 'error' };
-      }
-      return { 
-        content: `Pinging ${args[0]} [${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}] with 32 bytes of data:
-Reply from ${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}: bytes=32 time=${Math.floor(Math.random() * 20) + 5}ms TTL=64
-Reply from ${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}: bytes=32 time=${Math.floor(Math.random() * 20) + 5}ms TTL=64
-Reply from ${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}: bytes=32 time=${Math.floor(Math.random() * 20) + 5}ms TTL=64
-Reply from ${Math.floor(Math.random() * 255) + 1}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}.${Math.floor(Math.random() * 255)}: bytes=32 time=${Math.floor(Math.random() * 20) + 5}ms TTL=64
-
-Ping statistics for ${args[0]}:
-    Packets: Sent = 4, Received = 4, Lost = 0 (0% loss),
-Approximate round trip times in milli-seconds:
-    Minimum = ${Math.floor(Math.random() * 10) + 5}ms, Maximum = ${Math.floor(Math.random() * 30) + 15}ms, Average = ${Math.floor(Math.random() * 20) + 10}ms`,
-        type: 'standard'
-      };
-    
-    case 'ls':
-      return { 
-        content: `drwxr-xr-x  5 user  staff   160 Apr  8 10:45 .
-drwxr-xr-x  3 user  staff    96 Apr  8 10:30 ..
--rw-r--r--  1 user  staff  2489 Apr  8 10:35 audit_config.json
-drwxr-xr-x  8 user  staff   256 Apr  8 10:40 logs
--rwxr-xr-x  1 user  staff  8544 Apr  8 10:32 network_scanner.py
-drwxr-xr-x 12 user  staff   384 Apr  8 10:37 reports
-drwxr-xr-x  4 user  staff   128 Apr  8 10:42 scripts
--rw-r--r--  1 user  staff  4562 Apr  8 10:33 security_policy.xml
--rwxr-xr-x  1 user  staff 12680 Apr  8 10:31 system_monitor.py`, 
-        type: 'standard'
-      };
-    
-    case 'ifconfig':
-      return { 
-        content: `eth0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
-        inet 192.168.1.100  netmask 255.255.255.0  broadcast 192.168.1.255
-        inet6 fe80::1a:2b3c:4d5e  prefixlen 64  scopeid 0x20<link>
-        ether 00:1A:2B:3C:4D:5E  txqueuelen 1000  (Ethernet)
-        RX packets 846587  bytes 1234586754 (1.1 GiB)
-        RX errors 0  dropped 0  overruns 0  frame 0
-        TX packets 563821  bytes 68573418 (65.3 MiB)
-        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
-
-wlan0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
-        inet 192.168.1.101  netmask 255.255.255.0  broadcast 192.168.1.255
-        inet6 fe80::1a:2b3c:4d5f  prefixlen 64  scopeid 0x20<link>
-        ether 00:1A:2B:3C:4D:5F  txqueuelen 1000  (Ethernet)
-        RX packets 124568  bytes 178965423 (170.6 MiB)
-        RX errors 0  dropped 0  overruns 0  frame 0
-        TX packets 87654  bytes 12345678 (11.7 MiB)
-        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
-
-lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
-        inet 127.0.0.1  netmask 255.0.0.0
-        inet6 ::1  prefixlen 128  scopeid 0x10<host>
-        loop  txqueuelen 1000  (Local Loopback)
-        RX packets 78654  bytes 8765432 (8.3 MiB)
-        RX errors 0  dropped 0  overruns 0  frame 0
-        TX packets 78654  bytes 8765432 (8.3 MiB)
-        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0`, 
-        type: 'standard'
-      };
-    
-    case 'ps':
-      return { 
-        content: `  PID TTY          TIME CMD
-  1234 pts/0    00:00:01 bash
-  2345 pts/0    00:00:00 ps
-  3456 pts/1    00:05:23 system_monitor.py
-  4567 pts/1    00:01:45 network_scanner.py
-  5678 pts/1    00:00:12 audit.py
-  6789 ?        01:23:45 systemd
-  7890 ?        00:34:56 NetworkManager
-  8901 ?        00:12:34 sshd
-  9012 ?        00:23:45 cron
-  1122 ?        00:56:43 apache2
-  2233 ?        00:32:12 mysql`, 
-        type: 'standard'
-      };
-    
-    case 'clear':
-      return { content: '', type: 'standard' };
-    
-    case 'exit':
-      return { content: 'Goodbye!', type: 'info' };
-    
-    default:
-      if (command.trim() !== '') {
-        return { 
-          content: `Command not found: ${mainCommand}. Type 'help' to see available commands.`, 
-          type: 'error' 
-        };
-      }
-      return { content: '', type: 'standard' };
+            if (result.status === 'success') {
+              return { content: result.output, type: 'standard' };
+            } else {
+              return { 
+                content: `Command not found: ${mainCommand}. Type 'help' to see available commands.`, 
+                type: 'error' 
+              };
+            }
+          } catch (error) {
+            return { 
+              content: `Command not found: ${mainCommand}. Type 'help' to see available commands.`, 
+              type: 'error' 
+            };
+          }
+        }
+        return { content: '', type: 'standard' };
+    }
+  } catch (error) {
+    return { 
+      content: `Error executing command: ${(error as Error).message}`, 
+      type: 'error' 
+    };
   }
 }
