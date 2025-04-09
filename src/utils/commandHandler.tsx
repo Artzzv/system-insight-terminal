@@ -3,48 +3,23 @@ import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, PieChart, Pie, Cell, ResponsiveContainer, LineChart, Line } from 'recharts';
+import { 
+  getCpuInfo,
+  getMemoryInfo,
+  getDiskInfo,
+  getNetworkInfo,
+  getSystemInfo,
+  performSecurityAudit,
+  analyzeLogs,
+  aiAnalyzeLogs,
+  getSecurityPolicies,
+  executeShellCommand
+} from './systemInfo';
 
 interface CommandResult {
   content: React.ReactNode;
   type: 'standard' | 'success' | 'error' | 'warning' | 'info' | 'jsx';
 }
-
-// API endpoint URL - Update this to your actual backend URL
-const API_URL = 'http://localhost:5000/api';
-
-// Helper function to fetch data from the API
-const fetchFromApi = async (endpoint: string) => {
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`);
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error(`Error fetching from ${endpoint}:`, error);
-    throw error;
-  }
-};
-
-// Helper function to post data to the API
-const postToApi = async (endpoint: string, data: any) => {
-  try {
-    const response = await fetch(`${API_URL}${endpoint}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(data),
-    });
-    if (!response.ok) {
-      throw new Error(`API error: ${response.status}`);
-    }
-    return await response.json();
-  } catch (error) {
-    console.error(`Error posting to ${endpoint}:`, error);
-    throw error;
-  }
-};
 
 // Colors for charts
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D', '#FFC658'];
@@ -111,9 +86,8 @@ export async function executeCommand(command: string): Promise<CommandResult> {
         return { content: helpInfo, type: 'info' };
       
       case 'network-check':
-        // Fetch real network data from our API
         try {
-          const networkData = await fetchFromApi('/system/network');
+          const networkData = await getNetworkInfo();
           
           return { 
             content: (
@@ -201,18 +175,18 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error retrieving network information: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error retrieving network information: ${(error as Error).message}`,
             type: 'error' 
           };
         }
       
       case 'system-health':
         try {
-          // Fetch real system data from our API
-          const cpuData = await fetchFromApi('/system/cpu');
-          const memoryData = await fetchFromApi('/system/memory');
-          const diskData = await fetchFromApi('/system/disk');
-          const systemData = await fetchFromApi('/system/info');
+          // Get real system data using our Node.js functions
+          const cpuData = getCpuInfo();
+          const memoryData = getMemoryInfo();
+          const diskData = await getDiskInfo();
+          const systemData = getSystemInfo();
           
           // Calculate uptime
           const bootTime = new Date(systemData.boot_time);
@@ -329,15 +303,14 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error retrieving system health information: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error retrieving system health information: ${(error as Error).message}`,
             type: 'error' 
           };
         }
       
       case 'audit':
         try {
-          // Fetch real audit data from our API
-          const auditData = await fetchFromApi('/security/audit');
+          const auditData = await performSecurityAudit();
           
           // Create pie chart data for issues by severity
           const severityData = [
@@ -425,15 +398,14 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error performing security audit: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error performing security audit: ${(error as Error).message}`,
             type: 'error' 
           };
         }
       
       case 'show-policies':
         try {
-          // Fetch real policy data from our API
-          const policiesData = await fetchFromApi('/security/policies');
+          const policiesData = await getSecurityPolicies();
           
           return {
             content: (
@@ -515,7 +487,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error retrieving security policies: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error retrieving security policies: ${(error as Error).message}`,
             type: 'error' 
           };
         }
@@ -528,8 +500,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
             logPath = args[0];
           }
           
-          // Fetch real log data from our API
-          const logsData = await fetchFromApi(`/logs/analyze?path=${logPath}&limit=100`);
+          const logsData = await analyzeLogs(logPath);
           
           // Create chart data for log levels
           const levelData = [
@@ -667,7 +638,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error analyzing logs: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error analyzing logs: ${(error as Error).message}`,
             type: 'error' 
           };
         }
@@ -680,8 +651,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
             logPath = args[0];
           }
           
-          // Fetch AI analysis data from our API
-          const aiAnalysisData = await fetchFromApi(`/logs/ai-analysis?path=${logPath}&limit=1000`);
+          const aiAnalysisData = await aiAnalyzeLogs(logPath);
           
           // Prepare data for visualizations
           const timeSeriesData = aiAnalysisData.time_series || [];
@@ -826,7 +796,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error performing AI log analysis: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error performing AI log analysis: ${(error as Error).message}`,
             type: 'error' 
           };
         }
@@ -837,17 +807,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
         }
         
         try {
-          // Execute the real ping command via our API
-          const result = await postToApi('/system/exec', { command: `ping ${args[0]} ${process.platform === 'win32' ? '-n 4' : '-c 4'}` });
-          
-          if (result.status === 'success') {
-            return { content: result.output, type: 'standard' };
-          } else {
-            return { content: result.message, type: 'error' };
-          }
+          // Execute the real ping command
+          const pingCommand = `ping ${args[0]} ${process.platform === 'win32' ? '-n 4' : '-c 4'}`;
+          const output = await executeShellCommand(pingCommand);
+          return { content: output, type: 'standard' };
         } catch (error) {
           return { 
-            content: `Error executing ping command: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error executing ping command: ${(error as Error).message}`,
             type: 'error' 
           };
         }
@@ -857,34 +823,24 @@ export async function executeCommand(command: string): Promise<CommandResult> {
         try {
           // Execute the appropriate command based on the OS
           const command = process.platform === 'win32' ? 'ipconfig' : 'ifconfig';
-          const result = await postToApi('/system/exec', { command });
-          
-          if (result.status === 'success') {
-            return { content: result.output, type: 'standard' };
-          } else {
-            return { content: result.message, type: 'error' };
-          }
+          const output = await executeShellCommand(command);
+          return { content: output, type: 'standard' };
         } catch (error) {
           return { 
-            content: `Error executing network command: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error executing network command: ${(error as Error).message}`,
             type: 'error' 
           };
         }
       
       case 'ps':
         try {
-          // Execute the ps command via our API
+          // Execute the ps command
           const command = process.platform === 'win32' ? 'tasklist' : 'ps aux | head -20';
-          const result = await postToApi('/system/exec', { command });
-          
-          if (result.status === 'success') {
-            return { content: result.output, type: 'standard' };
-          } else {
-            return { content: result.message, type: 'error' };
-          }
+          const output = await executeShellCommand(command);
+          return { content: output, type: 'standard' };
         } catch (error) {
           return { 
-            content: `Error executing ps command: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error executing ps command: ${(error as Error).message}`,
             type: 'error' 
           };
         }
@@ -895,16 +851,11 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           // Execute the appropriate command based on the OS
           const path = args.length > 0 ? args[0] : '.';
           const command = process.platform === 'win32' ? `dir ${path}` : `ls -la ${path}`;
-          const result = await postToApi('/system/exec', { command });
-          
-          if (result.status === 'success') {
-            return { content: result.output, type: 'standard' };
-          } else {
-            return { content: result.message, type: 'error' };
-          }
+          const output = await executeShellCommand(command);
+          return { content: output, type: 'standard' };
         } catch (error) {
           return { 
-            content: `Error executing directory listing command: ${(error as Error).message}. Make sure the backend server is running.`,
+            content: `Error executing directory listing command: ${(error as Error).message}`,
             type: 'error' 
           };
         }
@@ -917,18 +868,10 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       default:
         if (command.trim() !== '') {
-          // Try to execute the command via our API if it's not recognized
+          // Try to execute the command directly
           try {
-            const result = await postToApi('/system/exec', { command });
-            
-            if (result.status === 'success') {
-              return { content: result.output, type: 'standard' };
-            } else {
-              return { 
-                content: `Command not found: ${mainCommand}. Type 'help' to see available commands.`, 
-                type: 'error' 
-              };
-            }
+            const output = await executeShellCommand(command);
+            return { content: output, type: 'standard' };
           } catch (error) {
             return { 
               content: `Command not found: ${mainCommand}. Type 'help' to see available commands.`, 
