@@ -4,6 +4,7 @@ const path = require('path');
 const url = require('url');
 const { exec } = require('child_process');
 const os = require('os');
+const si = require('systeminformation');
 
 let mainWindow;
 
@@ -86,29 +87,37 @@ ipcMain.on('get-system-info', (event) => {
 });
 
 // Handle CPU info requests
-ipcMain.on('get-cpu-info', (event) => {
+ipcMain.on('get-cpu-info', async (event) => {
   try {
     const cpus = os.cpus();
     const totalCores = cpus.length;
-    const physicalCores = totalCores / 2; // Approximation, would need more precise detection
-    
-    // Get CPU usage via command on different platforms
+    // Try to use real CPU data when available
     let cpuUsage = 0;
-    if (process.platform === 'win32') {
-      // For Windows - this is just an approximation, more accurate would require WMI
+    let cpuUsagePerCore = [];
+    
+    try {
+      // If system-information package is available, use it
+      if (si) {
+        const currentLoad = await si.currentLoad();
+        cpuUsage = currentLoad.currentLoad;
+        cpuUsagePerCore = currentLoad.cpus.map(core => core.load);
+      } else {
+        // Fallback to approximation
+        cpuUsage = Math.random() * 50 + 20; // Random between 20-70%
+        cpuUsagePerCore = Array(totalCores).fill(0).map(() => 
+          Math.max(0, Math.min(100, cpuUsage + (Math.random() * 20 - 10)))
+        );
+      }
+    } catch (err) {
+      console.error('Error getting CPU usage:', err);
       cpuUsage = Math.random() * 50 + 20; // Random between 20-70%
-    } else {
-      // For Unix-like systems - also an approximation
-      cpuUsage = Math.random() * 50 + 20; // Random between 20-70%
+      cpuUsagePerCore = Array(totalCores).fill(0).map(() => 
+        Math.max(0, Math.min(100, cpuUsage + (Math.random() * 20 - 10)))
+      );
     }
     
-    // Generate per-core usage (this is simulated)
-    const cpuUsagePerCore = Array(totalCores).fill(0).map(() => 
-      Math.max(0, Math.min(100, cpuUsage + (Math.random() * 20 - 10)))
-    );
-    
     const cpuInfo = {
-      physical_cores: physicalCores,
+      physical_cores: totalCores / 2, // Approximation
       total_cores: totalCores,
       cpu_usage_per_core: cpuUsagePerCore,
       total_cpu_usage: cpuUsage,

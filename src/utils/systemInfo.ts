@@ -1,6 +1,92 @@
 // Import the isElectron function from our utility file
 import { isElectron } from './isElectron';
 
+// Define types for our system information
+export interface SystemInfo {
+  hostname: string;
+  platform: string;
+  arch?: string;
+  cpus?: any[];
+  totalmem?: number;
+  freemem?: number;
+  uptime?: number;
+  boot_time: string;
+}
+
+export interface CpuInfo {
+  physical_cores: number;
+  total_cores: number;
+  cpu_usage_per_core: number[];
+  total_cpu_usage: number;
+  cpu_frequency: {
+    current: number;
+    min: number;
+    max: number;
+  };
+  model: string;
+}
+
+export interface MemoryInfo {
+  virtual_memory: {
+    total: number;
+    available: number;
+    used: number;
+    percentage: number;
+  };
+  swap: {
+    total: number;
+    used: number;
+    free: number;
+    percentage: number;
+  };
+}
+
+export interface DiskInfo {
+  partitions: Array<{
+    device: string;
+    mountpoint: string;
+    fstype: string;
+    total_size: number;
+    used: number;
+    free: number;
+    percentage: number;
+  }>;
+}
+
+export interface NetworkInfo {
+  interfaces: Record<string, {
+    ip: string;
+    mac: string;
+    netmask: string;
+  }>;
+  io_counters: {
+    bytes_sent: number;
+    bytes_received: number;
+    packets_sent: number;
+    packets_received: number;
+  };
+  connections: Array<{
+    type: string;
+    local_address: string;
+    remote_address: string;
+    status: string;
+  }>;
+}
+
+export interface SecurityAuditResult {
+  hostname: string;
+  issues_by_severity: {
+    high: number;
+    medium: number;
+    low: number;
+  };
+  issues: Array<{
+    severity: string;
+    issue: string;
+    recommendation: string;
+  }>;
+}
+
 // This will hold the real system modules when in Electron
 let os: any = null;
 let childProcess: any = null;
@@ -47,25 +133,14 @@ export const executeShellCommand = (command: string): Promise<string> => {
 };
 
 // Get CPU information using real OS module when in Electron
-export const getCpuInfo = async () => {
+export const getCpuInfo = async (): Promise<CpuInfo> => {
   if (isElectron()) {
     try {
-      return new Promise<{
-        physical_cores: number;
-        total_cores: number;
-        cpu_usage_per_core: number[];
-        total_cpu_usage: number;
-        cpu_frequency: {
-          current: number;
-          min: number;
-          max: number;
-        };
-        model: string;
-      }>((resolve) => {
+      return new Promise<CpuInfo>((resolve) => {
         // @ts-ignore
         window.api.send('get-cpu-info');
         // @ts-ignore
-        window.api.receive('cpu-info', (cpuInfo: any) => {
+        window.api.receive('cpu-info', (cpuInfo: CpuInfo) => {
           resolve(cpuInfo);
         });
       });
@@ -91,14 +166,14 @@ export const getCpuInfo = async () => {
 };
 
 // Get memory information using real OS module when in Electron
-export const getMemoryInfo = () => {
+export const getMemoryInfo = (): Promise<MemoryInfo> => {
   if (isElectron()) {
     try {
-      return new Promise((resolve) => {
+      return new Promise<MemoryInfo>((resolve) => {
         // @ts-ignore
         window.api.send('get-memory-info');
         // @ts-ignore
-        window.api.receive('memory-info', (memInfo: any) => {
+        window.api.receive('memory-info', (memInfo: MemoryInfo) => {
           resolve(memInfo);
         });
       });
@@ -113,7 +188,7 @@ export const getMemoryInfo = () => {
     const usedMemory = totalMemory - freeMemory;
     const usedPercent = Math.round((usedMemory / totalMemory) * 100);
     
-    return {
+    return Promise.resolve({
       virtual_memory: {
         total: totalMemory,
         available: freeMemory,
@@ -126,15 +201,15 @@ export const getMemoryInfo = () => {
         free: 3 * 1024 * 1024 * 1024,
         percentage: 25
       }
-    };
+    });
   }
 };
 
 // Get disk information
-export const getDiskInfo = async () => {
+export const getDiskInfo = async (): Promise<DiskInfo> => {
   if (isElectron()) {
     try {
-      return new Promise((resolve) => {
+      return new Promise<DiskInfo>((resolve) => {
         // We could implement IPC for disk info
         // For now, return simulated data
         setTimeout(() => {
@@ -159,7 +234,7 @@ export const getDiskInfo = async () => {
     }
   } else {
     // Return mock data for browser environment
-    return {
+    return Promise.resolve({
       partitions: [
         {
           device: 'C:',
@@ -171,12 +246,12 @@ export const getDiskInfo = async () => {
           percentage: 50
         }
       ]
-    };
+    });
   }
 };
 
 // Get network information
-export const getNetworkInfo = async () => {
+export const getNetworkInfo = async (): Promise<NetworkInfo> => {
   if (isElectron()) {
     try {
       // Implementation for real network info via IPC would go here
@@ -208,7 +283,7 @@ export const getNetworkInfo = async () => {
     }
   } else {
     // Return mock data for browser environment
-    return {
+    return Promise.resolve({
       interfaces: {
         'eth0': {
           ip: '192.168.1.100',
@@ -228,19 +303,19 @@ export const getNetworkInfo = async () => {
         remote_address: `192.168.1.${10 + i}:80`,
         status: i % 2 ? 'ESTABLISHED' : 'LISTEN'
       }))
-    };
+    });
   }
 };
 
 // Get system information
-export const getSystemInfo = () => {
+export const getSystemInfo = (): Promise<SystemInfo> => {
   if (isElectron()) {
     try {
-      return new Promise((resolve) => {
+      return new Promise<SystemInfo>((resolve) => {
         // @ts-ignore
         window.api.send('get-system-info');
         // @ts-ignore
-        window.api.receive('system-info', (sysInfo: any) => {
+        window.api.receive('system-info', (sysInfo: SystemInfo) => {
           resolve(sysInfo);
         });
       });
@@ -253,16 +328,16 @@ export const getSystemInfo = () => {
     const bootTime = new Date();
     bootTime.setHours(bootTime.getHours() - 24); // 24 hours uptime
     
-    return {
+    return Promise.resolve({
       hostname: 'browser-host',
       platform: 'Browser (Simulated)',
       boot_time: bootTime.toISOString()
-    };
+    });
   }
 };
 
 // Security audit (simplified)
-export const performSecurityAudit = async () => {
+export const performSecurityAudit = async (): Promise<SecurityAuditResult> => {
   if (isElectron()) {
     try {
       // Implementation for real security audit via IPC would go here
@@ -294,7 +369,7 @@ export const performSecurityAudit = async () => {
     }
   } else {
     // Return mock data for browser environment
-    return {
+    return Promise.resolve({
       hostname: 'browser-host',
       issues_by_severity: { high: 1, medium: 2, low: 3 },
       issues: [
@@ -314,7 +389,7 @@ export const performSecurityAudit = async () => {
           recommendation: 'Disable unnecessary services'
         }
       ]
-    };
+    });
   }
 };
 
