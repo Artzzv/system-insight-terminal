@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -183,10 +182,10 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       case 'system-health':
         try {
           // Get real system data using our Node.js functions
-          const cpuData = getCpuInfo();
-          const memoryData = getMemoryInfo();
+          const cpuData = await getCpuInfo();
+          const memoryData = await getMemoryInfo();
           const diskData = await getDiskInfo();
-          const systemData = getSystemInfo();
+          const systemData = await getSystemInfo();
           
           // Calculate uptime
           const bootTime = new Date(systemData.boot_time);

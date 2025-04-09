@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import TerminalHeader from './TerminalHeader';
@@ -6,7 +5,7 @@ import TerminalOutput, { TerminalOutputLine, OutputType } from './TerminalOutput
 import TerminalInput from './TerminalInput';
 import { executeCommand } from '@/utils/commandHandler';
 import { Separator } from '@/components/ui/separator';
-import { isElectron } from '@/utils/systemInfo';
+import { isElectron } from '@/utils/isElectron';
 
 interface TerminalProps {
   title?: string;
