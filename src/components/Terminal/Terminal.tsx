@@ -121,7 +121,8 @@ const Terminal: React.FC<TerminalProps> = ({
   useEffect(() => {
     if (outputLines.length === 0) {
       addOutputLine(`Welcome to System Insight Terminal v1.2.0`, 'info');
-      addOutputLine(`Real-time system monitoring is now available.`, 'success');
+      addOutputLine(`NOTE: Running in browser mode with simulated system data.`, 'warning');
+      addOutputLine(`Real-time system monitoring is available in Electron app mode.`, 'info');
       addOutputLine(`Type 'help' to see available commands`, 'info');
       addOutputLine('', 'standard');
     }

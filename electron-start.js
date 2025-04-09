@@ -9,7 +9,11 @@ process.env.ELECTRON_START_URL = 'http://localhost:5173';
 
 // Start the Electron app
 const child = spawn(electron, [path.join(__dirname, 'src/electron/main.js')], {
-  stdio: 'inherit'
+  stdio: 'inherit',
+  env: {
+    ...process.env,
+    ELECTRON_DISABLE_SECURITY_WARNINGS: 'true'
+  }
 });
 
 child.on('close', (code) => {
