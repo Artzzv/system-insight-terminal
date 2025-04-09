@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
@@ -12,8 +13,12 @@ import {
   analyzeLogs,
   aiAnalyzeLogs,
   getSecurityPolicies,
-  executeShellCommand
+  executeShellCommand,
+  getWindowsEventLogs,
+  getWindowsDefenderStatus,
+  getFirewallRules
 } from './systemInfo';
+import { isElectron } from './isElectron';
 
 interface CommandResult {
   content: React.ReactNode;
@@ -53,16 +58,17 @@ Network Commands:
 Security Commands:
   audit               Run a real-time security audit
   show-policies       Display actual security policies
-  analyze-logs        Analyze system logs (supports different log files)
-  ai-analyze-logs     Use AI/ML to analyze logs and detect anomalies
-  scan-ports          Scan for open ports
-  check-updates       Check for security updates
+  show-defender       Show Windows Defender status
+  show-firewall       Show Windows Firewall rules
 
 Log Analysis:
-  analyze-logs [path] Analyze system logs (default: syslog/System)
-  analyze-logs Auth   Analyze authentication logs
-  analyze-logs Security Analyze security logs (Windows)
-  analyze-logs Application Analyze application logs (Windows)
+  analyze-logs [path] Analyze system logs (default: System)
+  analyze-logs Application   Analyze application logs
+  analyze-logs Security      Analyze security logs
+  analyze-logs <name>        Analyze specific Windows event log
+  
+  event-logs [log] [count]   Show raw Windows event logs
+  ai-analyze-logs [log]      AI-powered log analysis with anomaly detection
 
 File Operations:
   ls [dir]            List directory contents
@@ -86,6 +92,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       case 'network-check':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           const networkData = await getNetworkInfo();
           
           return { 
@@ -181,6 +194,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       case 'system-health':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Get real system data using our Node.js functions
           const cpuData = await getCpuInfo();
           const memoryData = await getMemoryInfo();
@@ -242,6 +262,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                     {cpuData.cpu_frequency.current && (
                       <div>CPU Frequency: {cpuData.cpu_frequency.current.toFixed(0)} MHz</div>
                     )}
+                    <div>CPU Model: {cpuData.model}</div>
                   </div>
                 </div>
                 
@@ -309,6 +330,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       case 'audit':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           const auditData = await performSecurityAudit();
           
           // Create pie chart data for issues by severity
@@ -378,6 +406,62 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                   </>
                 )}
                 
+                {auditData.defender_status && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Windows Defender Status:</p>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      <div className="flex items-center">
+                        <span className={auditData.defender_status.realtime_protection ? 'text-terminal-success' : 'text-terminal-error'}>
+                          Real-time Protection: {auditData.defender_status.realtime_protection ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div className="flex items-center">
+                        <span className={auditData.defender_status.antivirus_enabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                          Antivirus: {auditData.defender_status.antivirus_enabled ? 'Enabled' : 'Disabled'}
+                        </span>
+                      </div>
+                      <div className="col-span-2">
+                        <span>Definitions Last Updated: {auditData.defender_status.definitions_updated}</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                
+                {auditData.firewall_status && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">Firewall Status:</p>
+                    <div className="max-h-24 overflow-y-auto">
+                      <table className="min-w-full">
+                        <thead>
+                          <tr>
+                            <th className="text-left pr-4">Profile</th>
+                            <th className="text-left">Status</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {Array.isArray(auditData.firewall_status) ? (
+                            auditData.firewall_status.map((profile: any, index: number) => (
+                              <tr key={index}>
+                                <td className="pr-4">{profile.Name}</td>
+                                <td className={profile.Enabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                                  {profile.Enabled ? 'Enabled' : 'Disabled'}
+                                </td>
+                              </tr>
+                            ))
+                          ) : (
+                            <tr>
+                              <td className="pr-4">{auditData.firewall_status.Name}</td>
+                              <td className={auditData.firewall_status.Enabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                                {auditData.firewall_status.Enabled ? 'Enabled' : 'Disabled'}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+                
                 {auditData.issues.length === 0 && (
                   <p className="text-terminal-success">
                     No security issues found. Your system is properly configured.
@@ -404,6 +488,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       case 'show-policies':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           const policiesData = await getSecurityPolicies();
           
           return {
@@ -478,7 +569,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                 </div>
                 
                 <p className="mt-2">
-                  To view details of additional policies, use: <span className="text-terminal-command">show-policies --detail access_control</span>
+                  For detailed firewall information, use: <span className="text-terminal-command">show-firewall</span>
                 </p>
               </div>
             ),
@@ -491,8 +582,235 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         }
       
+      case 'show-defender':
+        try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
+          const defenderStatus = await getWindowsDefenderStatus();
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p className="font-semibold">Windows Defender Status:</p>
+                
+                <div className="space-y-2">
+                  <table className="min-w-full">
+                    <tbody>
+                      <tr>
+                        <td className="pr-4">Real-time Protection:</td>
+                        <td className={defenderStatus.RealTimeProtectionEnabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                          {defenderStatus.RealTimeProtectionEnabled ? 'Enabled' : 'Disabled'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Antivirus:</td>
+                        <td className={defenderStatus.AntivirusEnabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                          {defenderStatus.AntivirusEnabled ? 'Enabled' : 'Disabled'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Antispyware:</td>
+                        <td className={defenderStatus.AntispywareEnabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                          {defenderStatus.AntispywareEnabled ? 'Enabled' : 'Disabled'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Behavior Monitoring:</td>
+                        <td className={defenderStatus.BehaviorMonitorEnabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                          {defenderStatus.BehaviorMonitorEnabled ? 'Enabled' : 'Disabled'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">IOAV Protection:</td>
+                        <td className={defenderStatus.IoavProtectionEnabled ? 'text-terminal-success' : 'text-terminal-error'}>
+                          {defenderStatus.IoavProtectionEnabled ? 'Enabled' : 'Disabled'}
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Engine Version:</td>
+                        <td>{defenderStatus.AMEngineVersion || 'Unknown'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Signatures Last Updated:</td>
+                        <td>{defenderStatus.AntivirusSignatureLastUpdated || 'Unknown'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Days Since Full Scan:</td>
+                        <td>{defenderStatus.FullScanAge !== undefined ? defenderStatus.FullScanAge : 'Unknown'}</td>
+                      </tr>
+                      <tr>
+                        <td className="pr-4">Days Since Quick Scan:</td>
+                        <td>{defenderStatus.QuickScanAge !== undefined ? defenderStatus.QuickScanAge : 'Unknown'}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+                
+                <p className="mt-2">
+                  For a full security assessment, run: <span className="text-terminal-command">audit</span>
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error retrieving Windows Defender status: ${(error as Error).message}`,
+            type: 'error' 
+          };
+        }
+      
+      case 'show-firewall':
+        try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
+          const firewallRules = await getFirewallRules();
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p className="font-semibold">Windows Firewall Rules:</p>
+                
+                <div className="space-y-2">
+                  <div className="max-h-60 overflow-y-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left pr-4">Name</th>
+                          <th className="text-left pr-4">Direction</th>
+                          <th className="text-left pr-4">Action</th>
+                          <th className="text-left">Profile</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {firewallRules.slice(0, 50).map((rule: any, index: number) => (
+                          <tr key={index}>
+                            <td className="pr-4">{rule.DisplayName || rule.Name}</td>
+                            <td className="pr-4">{rule.Direction}</td>
+                            <td className="pr-4" className={rule.Action === 'Allow' ? 'text-terminal-success' : 'text-terminal-error'}>
+                              {rule.Action}
+                            </td>
+                            <td>{
+                              typeof rule.Profile === 'object' 
+                                ? Object.keys(rule.Profile).filter(key => rule.Profile[key]).join(', ')
+                                : rule.Profile
+                            }</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  {firewallRules.length > 50 && (
+                    <p className="text-xs text-terminal-info">
+                      Showing 50 of {firewallRules.length} rules
+                    </p>
+                  )}
+                </div>
+                
+                <p className="mt-2">
+                  For a complete security assessment, run: <span className="text-terminal-command">audit</span>
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error retrieving firewall rules: ${(error as Error).message}`,
+            type: 'error' 
+          };
+        }
+        
+      case 'event-logs':
+        try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
+          // Determine which log to query
+          const logName = args[0] || 'System';
+          const count = args[1] ? parseInt(args[1], 10) : 20;
+          
+          const logs = await getWindowsEventLogs(logName, count);
+          
+          return {
+            content: (
+              <div className="space-y-4">
+                <p className="font-semibold">Windows Event Logs - {logName}:</p>
+                
+                <div className="space-y-2">
+                  <div className="max-h-80 overflow-y-auto">
+                    <table className="min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left pr-4">Time</th>
+                          <th className="text-left pr-4">ID</th>
+                          <th className="text-left pr-4">Level</th>
+                          <th className="text-left pr-4">Provider</th>
+                          <th className="text-left">Message</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {logs.map((log: any, index: number) => (
+                          <tr key={index}>
+                            <td className="pr-4 text-xs">{log.TimeCreated}</td>
+                            <td className="pr-4">{log.Id}</td>
+                            <td className={`pr-4 ${
+                              log.LevelDisplayName === 'Error' || log.LevelDisplayName === 'Critical' ? 'text-terminal-error' : 
+                              log.LevelDisplayName === 'Warning' ? 'text-terminal-warning' : 'text-terminal-info'
+                            }`}>
+                              {log.LevelDisplayName}
+                            </td>
+                            <td className="pr-4">{log.ProviderName}</td>
+                            <td className="truncate max-w-xs">{log.Message}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  
+                  <p className="text-xs text-terminal-info">
+                    Showing {logs.length} events from the {logName} log
+                  </p>
+                </div>
+                
+                <p className="mt-2">
+                  For AI-powered log analysis, use: <span className="text-terminal-command">ai-analyze-logs {logName}</span>
+                </p>
+              </div>
+            ),
+            type: 'jsx'
+          };
+        } catch (error) {
+          return { 
+            content: `Error retrieving Windows event logs: ${(error as Error).message}`,
+            type: 'error' 
+          };
+        }
+      
       case 'analyze-logs':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Determine which log path to analyze
           let logPath = 'System'; // Default
           if (args.length > 0) {
@@ -512,7 +830,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           return {
             content: (
               <div className="space-y-4">
-                <p>Log Analysis for {logPath}:</p>
+                <p>Windows Event Log Analysis for {logPath}:</p>
                 
                 {/* Log level distribution chart */}
                 {levelData.length > 0 && (
@@ -541,12 +859,12 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                 {/* Most active services */}
                 {Object.keys(logsData.services).length > 0 && (
                   <div className="space-y-2">
-                    <p className="font-semibold">Most Active Services:</p>
+                    <p className="font-semibold">Most Active Providers:</p>
                     <div className="max-h-24 overflow-y-auto">
                       <table className="min-w-full">
                         <thead>
                           <tr>
-                            <th className="text-left pr-4">Service</th>
+                            <th className="text-left pr-4">Provider</th>
                             <th className="text-left">Count</th>
                           </tr>
                         </thead>
@@ -593,22 +911,22 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                         <tr>
                           <th className="text-left pr-4">Timestamp</th>
                           <th className="text-left pr-4">Level</th>
-                          <th className="text-left pr-4">Service</th>
+                          <th className="text-left pr-4">Provider</th>
                           <th className="text-left">Message</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {logsData.entries.map((log: any, index: number) => (
+                        {logsData.entries.slice(0, 10).map((log: any, index: number) => (
                           <tr key={index}>
-                            <td className="pr-4 text-xs">{log.timestamp}</td>
+                            <td className="pr-4 text-xs">{log.TimeCreated}</td>
                             <td className={`pr-4 ${
-                              log.level === 'ERROR' || log.level === 'CRITICAL' ? 'text-terminal-error' : 
-                              log.level === 'WARNING' ? 'text-terminal-warning' : 'text-terminal-info'
+                              log.LevelDisplayName === 'Error' || log.LevelDisplayName === 'Critical' ? 'text-terminal-error' : 
+                              log.LevelDisplayName === 'Warning' ? 'text-terminal-warning' : 'text-terminal-info'
                             }`}>
-                              {log.level}
+                              {log.LevelDisplayName}
                             </td>
-                            <td className="pr-4">{log.service}</td>
-                            <td className="truncate max-w-xs">{log.message}</td>
+                            <td className="pr-4">{log.ProviderName}</td>
+                            <td className="truncate max-w-xs">{log.Message}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -637,13 +955,20 @@ export async function executeCommand(command: string): Promise<CommandResult> {
           };
         } catch (error) {
           return { 
-            content: `Error analyzing logs: ${(error as Error).message}`,
+            content: `Error analyzing Windows event logs: ${(error as Error).message}`,
             type: 'error' 
           };
         }
       
       case 'ai-analyze-logs':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Determine which log path to analyze
           let logPath = 'System'; // Default
           if (args.length > 0) {
@@ -726,6 +1051,40 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                   </div>
                 )}
                 
+                {/* Clusters - AI Grouping */}
+                {aiAnalysisData.clusters && aiAnalysisData.clusters.length > 0 && (
+                  <div className="space-y-2">
+                    <p className="font-semibold">AI-Detected Log Clusters:</p>
+                    <div className="max-h-60 overflow-y-auto space-y-3">
+                      {aiAnalysisData.clusters.map((cluster: any, index: number) => (
+                        <div key={index} className="p-3 border border-border rounded-md">
+                          <div className="flex justify-between items-start">
+                            <div className="font-semibold">Cluster {index + 1}</div>
+                            <div className="bg-secondary px-2 py-1 rounded text-xs">{cluster.size} logs</div>
+                          </div>
+                          
+                          {cluster.common_terms && cluster.common_terms.length > 0 && (
+                            <div className="mt-2">
+                              <span className="text-xs text-muted-foreground">Common Terms: </span>
+                              <span className="text-xs">
+                                {cluster.common_terms.slice(0, 3).map(([term, count]: [string, number]) => 
+                                  `${term} (${count})`
+                                ).join(', ')}
+                              </span>
+                            </div>
+                          )}
+                          
+                          {cluster.examples && cluster.examples.length > 0 && (
+                            <div className="mt-1 text-xs text-muted-foreground">
+                              <div>Example: {cluster.examples[0]}</div>
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 {/* Error clusters */}
                 {errorClusters.length > 0 && (
                   <div className="space-y-2">
@@ -759,13 +1118,14 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                       {aiAnalysisData.anomalies.map((anomaly: any, index: number) => (
                         <div key={index} className="bg-secondary p-3 rounded-md border-l-4 border-terminal-error">
                           <div className="font-semibold">
-                            {anomaly.type === 'error_spike' ? 'Error Rate Spike' : anomaly.type}
+                            {anomaly.type === 'statistical_outlier' ? 'Statistical Outlier' : anomaly.type}
                           </div>
                           <div className="text-sm">{anomaly.description}</div>
-                          <div className="text-xs text-muted-foreground mt-1">
-                            {anomaly.time ? `Time: ${anomaly.time}` : ''}
-                            {anomaly.deviation ? ` - ${anomaly.deviation}` : ''}
-                          </div>
+                          {anomaly.log && (
+                            <div className="text-xs text-muted-foreground mt-1 truncate">
+                              {anomaly.log.Message}
+                            </div>
+                          )}
                         </div>
                       ))}
                     </div>
@@ -777,7 +1137,7 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                   <div className="space-y-2">
                     <p className="font-semibold">Common Terms:</p>
                     <div className="flex flex-wrap gap-2">
-                      {aiAnalysisData.top_patterns.map(([term, count]: [string, number], index: number) => (
+                      {aiAnalysisData.top_patterns.slice(0, 10).map(([term, count]: [string, number], index: number) => (
                         <div key={index} className="bg-secondary px-2 py-1 rounded text-xs">
                           {term} ({count})
                         </div>
@@ -787,7 +1147,8 @@ export async function executeCommand(command: string): Promise<CommandResult> {
                 )}
                 
                 <p className="text-terminal-info font-semibold mt-2">
-                  AI analysis complete. {aiAnalysisData.anomalies?.length ? `${aiAnalysisData.anomalies.length} anomalies detected.` : 'No significant anomalies detected.'}
+                  AI analysis complete. Using unsupervised learning (K-means clustering, PCA & statistical anomaly detection) for pattern recognition.
+                  {aiAnalysisData.anomalies?.length ? ` ${aiAnalysisData.anomalies.length} anomalies detected.` : ' No significant anomalies detected.'}
                 </p>
               </div>
             ),
@@ -806,6 +1167,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
         }
         
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Execute the real ping command
           const pingCommand = `ping ${args[0]} ${process.platform === 'win32' ? '-n 4' : '-c 4'}`;
           const output = await executeShellCommand(pingCommand);
@@ -820,6 +1188,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       case 'ifconfig':
       case 'ipconfig':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Execute the appropriate command based on the OS
           const command = process.platform === 'win32' ? 'ipconfig' : 'ifconfig';
           const output = await executeShellCommand(command);
@@ -833,6 +1208,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       case 'ps':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Execute the ps command
           const command = process.platform === 'win32' ? 'tasklist' : 'ps aux | head -20';
           const output = await executeShellCommand(command);
@@ -847,6 +1229,13 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       case 'ls':
       case 'dir':
         try {
+          if (!isElectron()) {
+            return { 
+              content: 'This feature requires Electron with full system access',
+              type: 'error' 
+            };
+          }
+          
           // Execute the appropriate command based on the OS
           const path = args.length > 0 ? args[0] : '.';
           const command = process.platform === 'win32' ? `dir ${path}` : `ls -la ${path}`;
@@ -867,8 +1256,15 @@ export async function executeCommand(command: string): Promise<CommandResult> {
       
       default:
         if (command.trim() !== '') {
-          // Try to execute the command directly
           try {
+            if (!isElectron()) {
+              return { 
+                content: 'This feature requires Electron with full system access',
+                type: 'error' 
+              };
+            }
+            
+            // Try to execute the command directly
             const output = await executeShellCommand(command);
             return { content: output, type: 'standard' };
           } catch (error) {

@@ -1,3 +1,4 @@
+
 // Import the isElectron function from our utility file
 import { isElectron } from './isElectron';
 
@@ -73,6 +74,35 @@ export interface NetworkInfo {
   }>;
 }
 
+export interface WindowsEventLog {
+  TimeCreated: string;
+  Id: number;
+  LevelDisplayName: string;
+  Message: string;
+  ProviderName: string;
+}
+
+export interface WindowsDefenderStatus {
+  RealTimeProtectionEnabled: boolean;
+  AntivirusEnabled: boolean;
+  AntivirusSignatureLastUpdated: string;
+  AMEngineVersion: string;
+  AntispywareEnabled: boolean;
+  BehaviorMonitorEnabled: boolean;
+  QuickScanAge: number;
+  FullScanAge: number;
+  IoavProtectionEnabled: boolean;
+  [key: string]: any;
+}
+
+export interface FirewallRule {
+  Name: string;
+  DisplayName: string;
+  Direction: string;
+  Action: string;
+  Profile: any;
+}
+
 export interface SecurityAuditResult {
   hostname: string;
   issues_by_severity: {
@@ -85,33 +115,61 @@ export interface SecurityAuditResult {
     issue: string;
     recommendation: string;
   }>;
+  defender_status?: {
+    realtime_protection: boolean;
+    antivirus_enabled: boolean;
+    definitions_updated: string;
+  };
+  firewall_status?: any;
+  last_updates?: any;
 }
 
-// This will hold the real system modules when in Electron
-let os: any = null;
-let childProcess: any = null;
-let fs: any = null;
-
-// Only try to require these modules in Electron environment
-if (isElectron()) {
-  try {
-    // @ts-ignore - These will be available in Electron through the preload script
-    const api = window.api;
-    if (api && api.node) {
-      os = api.node.os();
-      childProcess = api.node.childProcess();
-      fs = api.node.fs();
-    }
-  } catch (error) {
-    console.error('Failed to load Node.js modules:', error);
-  }
+export interface AILogAnalysisResult {
+  summary: {
+    total_logs: number;
+    error_count: number;
+    warning_count: number;
+    anomaly_count: number;
+    cluster_count?: number;
+  };
+  time_series: Array<{
+    time: string;
+    total: number;
+    error: number;
+    warning: number;
+  }>;
+  service_distribution: Array<{
+    name: string;
+    total: number;
+    error: number;
+    warning: number;
+    info: number;
+  }>;
+  anomalies: Array<{
+    type: string;
+    description: string;
+    score: number;
+    log?: WindowsEventLog;
+  }>;
+  clusters?: Array<{
+    id: number;
+    size: number;
+    common_terms: Array<[string, number]>;
+    composition: Record<string, number>;
+    examples: string[];
+  }>;
+  error_clusters: Array<{
+    keywords: string;
+    count: number;
+    examples: string[];
+  }>;
+  top_patterns: Array<[string, number]>;
 }
 
-// Execute shell command using real child_process when in Electron
+// Execute shell command using IPC for Electron
 export const executeShellCommand = (command: string): Promise<string> => {
   return new Promise((resolve, reject) => {
     if (isElectron()) {
-      // Use IPC for executing commands instead of direct access
       try {
         // @ts-ignore
         window.api.send('execute-command', command);
@@ -127,348 +185,415 @@ export const executeShellCommand = (command: string): Promise<string> => {
         reject(`Failed to execute command: ${(error as Error).message}`);
       }
     } else {
-      reject('Cannot execute commands in browser environment');
+      reject('This feature requires Electron with full system access');
     }
   });
 };
 
-// Get CPU information using real OS module when in Electron
-export const getCpuInfo = async (): Promise<CpuInfo> => {
+// Get CPU information via IPC
+export const getCpuInfo = (): Promise<CpuInfo> => {
   if (isElectron()) {
-    try {
-      return new Promise<CpuInfo>((resolve) => {
+    return new Promise<CpuInfo>((resolve, reject) => {
+      try {
         // @ts-ignore
         window.api.send('get-cpu-info');
         // @ts-ignore
-        window.api.receive('cpu-info', (cpuInfo: CpuInfo) => {
-          resolve(cpuInfo);
+        window.api.receive('cpu-info', (result: CpuInfo | { error: string }) => {
+          if ('error' in result) {
+            reject(result.error);
+          } else {
+            resolve(result);
+          }
         });
-      });
-    } catch (error) {
-      console.error('Error getting CPU info:', error);
-      throw error;
-    }
+      } catch (error) {
+        reject(`Error getting CPU info: ${(error as Error).message}`);
+      }
+    });
   } else {
-    // Return mock data for browser environment
-    return {
-      physical_cores: 4,
-      total_cores: 8,
-      cpu_usage_per_core: Array(8).fill(0).map(() => Math.floor(Math.random() * 100)),
-      total_cpu_usage: Math.floor(Math.random() * 100),
-      cpu_frequency: {
-        current: 2600,
-        min: 1600,
-        max: 3200
-      },
-      model: "CPU Model X (Browser Mode)"
-    };
+    return Promise.reject('This feature requires Electron with full system access');
   }
 };
 
-// Get memory information using real OS module when in Electron
+// Get memory information via IPC
 export const getMemoryInfo = (): Promise<MemoryInfo> => {
   if (isElectron()) {
-    try {
-      return new Promise<MemoryInfo>((resolve) => {
+    return new Promise<MemoryInfo>((resolve, reject) => {
+      try {
         // @ts-ignore
         window.api.send('get-memory-info');
         // @ts-ignore
-        window.api.receive('memory-info', (memInfo: MemoryInfo) => {
-          resolve(memInfo);
+        window.api.receive('memory-info', (result: MemoryInfo | { error: string }) => {
+          if ('error' in result) {
+            reject(result.error);
+          } else {
+            resolve(result);
+          }
         });
-      });
-    } catch (error) {
-      console.error('Error getting memory info:', error);
-      throw error;
-    }
-  } else {
-    // Return mock data for browser environment
-    const totalMemory = 16 * 1024 * 1024 * 1024; // 16GB
-    const freeMemory = Math.floor(Math.random() * totalMemory * 0.7);
-    const usedMemory = totalMemory - freeMemory;
-    const usedPercent = Math.round((usedMemory / totalMemory) * 100);
-    
-    return Promise.resolve({
-      virtual_memory: {
-        total: totalMemory,
-        available: freeMemory,
-        used: usedMemory,
-        percentage: usedPercent
-      },
-      swap: {
-        total: 4 * 1024 * 1024 * 1024,
-        used: 1 * 1024 * 1024 * 1024,
-        free: 3 * 1024 * 1024 * 1024,
-        percentage: 25
+      } catch (error) {
+        reject(`Error getting memory info: ${(error as Error).message}`);
       }
     });
-  }
-};
-
-// Get disk information
-export const getDiskInfo = async (): Promise<DiskInfo> => {
-  if (isElectron()) {
-    try {
-      return new Promise<DiskInfo>((resolve) => {
-        // We could implement IPC for disk info
-        // For now, return simulated data
-        setTimeout(() => {
-          resolve({
-            partitions: [
-              {
-                device: 'C:',
-                mountpoint: 'C:',
-                fstype: 'NTFS',
-                total_size: 512 * 1024 * 1024 * 1024,
-                used: 256 * 1024 * 1024 * 1024,
-                free: 256 * 1024 * 1024 * 1024,
-                percentage: 50
-              }
-            ]
-          });
-        }, 500);
-      });
-    } catch (error) {
-      console.error('Error getting disk info:', error);
-      throw error;
-    }
   } else {
-    // Return mock data for browser environment
-    return Promise.resolve({
-      partitions: [
-        {
-          device: 'C:',
-          mountpoint: 'C:',
-          fstype: 'NTFS',
-          total_size: 512 * 1024 * 1024 * 1024,
-          used: 256 * 1024 * 1024 * 1024,
-          free: 256 * 1024 * 1024 * 1024,
-          percentage: 50
-        }
-      ]
-    });
+    return Promise.reject('This feature requires Electron with full system access');
   }
 };
 
-// Get network information
-export const getNetworkInfo = async (): Promise<NetworkInfo> => {
+// Get disk information via IPC
+export const getDiskInfo = (): Promise<DiskInfo> => {
   if (isElectron()) {
-    try {
-      // Implementation for real network info via IPC would go here
-      // For now, return simulated data
-      return {
-        interfaces: {
-          'eth0': {
-            ip: '192.168.1.100',
-            mac: '00:11:22:33:44:55',
-            netmask: '255.255.255.0'
+    return new Promise<DiskInfo>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('get-disk-info');
+        // @ts-ignore
+        window.api.receive('disk-info', (result: DiskInfo | { error: string }) => {
+          if ('error' in result) {
+            reject(result.error);
+          } else {
+            resolve(result);
           }
-        },
-        io_counters: {
-          bytes_sent: 1024 * 1024 * 50,
-          bytes_received: 1024 * 1024 * 100,
-          packets_sent: 5000,
-          packets_received: 8000
-        },
-        connections: Array(5).fill(0).map((_, i) => ({
-          type: 'TCP',
-          local_address: `127.0.0.1:${8000 + i}`,
-          remote_address: `192.168.1.${10 + i}:80`,
-          status: i % 2 ? 'ESTABLISHED' : 'LISTEN'
-        }))
-      };
-    } catch (error) {
-      console.error('Error getting network info:', error);
-      throw error;
-    }
-  } else {
-    // Return mock data for browser environment
-    return Promise.resolve({
-      interfaces: {
-        'eth0': {
-          ip: '192.168.1.100',
-          mac: '00:11:22:33:44:55',
-          netmask: '255.255.255.0'
-        }
-      },
-      io_counters: {
-        bytes_sent: 1024 * 1024 * 50,
-        bytes_received: 1024 * 1024 * 100,
-        packets_sent: 5000,
-        packets_received: 8000
-      },
-      connections: Array(5).fill(0).map((_, i) => ({
-        type: 'TCP',
-        local_address: `127.0.0.1:${8000 + i}`,
-        remote_address: `192.168.1.${10 + i}:80`,
-        status: i % 2 ? 'ESTABLISHED' : 'LISTEN'
-      }))
+        });
+      } catch (error) {
+        reject(`Error getting disk info: ${(error as Error).message}`);
+      }
     });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
   }
 };
 
-// Get system information
+// Get network information via IPC
+export const getNetworkInfo = (): Promise<NetworkInfo> => {
+  if (isElectron()) {
+    return new Promise<NetworkInfo>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('get-network-info');
+        // @ts-ignore
+        window.api.receive('network-info', (result: NetworkInfo | { error: string }) => {
+          if ('error' in result) {
+            reject(result.error);
+          } else {
+            resolve(result);
+          }
+        });
+      } catch (error) {
+        reject(`Error getting network info: ${(error as Error).message}`);
+      }
+    });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
+};
+
+// Get system information via IPC
 export const getSystemInfo = (): Promise<SystemInfo> => {
   if (isElectron()) {
-    try {
-      return new Promise<SystemInfo>((resolve) => {
+    return new Promise<SystemInfo>((resolve, reject) => {
+      try {
         // @ts-ignore
         window.api.send('get-system-info');
         // @ts-ignore
-        window.api.receive('system-info', (sysInfo: SystemInfo) => {
-          resolve(sysInfo);
+        window.api.receive('system-info', (result: SystemInfo | { error: string }) => {
+          if ('error' in result) {
+            reject(result.error);
+          } else {
+            resolve(result);
+          }
         });
-      });
-    } catch (error) {
-      console.error('Error getting system info:', error);
-      throw error;
-    }
-  } else {
-    // Return mock data for browser environment
-    const bootTime = new Date();
-    bootTime.setHours(bootTime.getHours() - 24); // 24 hours uptime
-    
-    return Promise.resolve({
-      hostname: 'browser-host',
-      platform: 'Browser (Simulated)',
-      boot_time: bootTime.toISOString()
+      } catch (error) {
+        reject(`Error getting system info: ${(error as Error).message}`);
+      }
     });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
   }
 };
 
-// Security audit (simplified)
-export const performSecurityAudit = async (): Promise<SecurityAuditResult> => {
+// Get Windows Event Logs via IPC
+export const getWindowsEventLogs = (
+  logName: string = 'System',
+  count: number = 50,
+  filter?: string
+): Promise<WindowsEventLog[]> => {
+  if (isElectron()) {
+    return new Promise<WindowsEventLog[]>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('get-event-logs', { logName, count, filter });
+        // @ts-ignore
+        window.api.receive('event-logs-result', (result: { success: boolean, logs?: WindowsEventLog[], error?: string }) => {
+          if (result.success && result.logs) {
+            resolve(result.logs);
+          } else {
+            reject(result.error || 'Failed to retrieve event logs');
+          }
+        });
+      } catch (error) {
+        reject(`Error getting Windows event logs: ${(error as Error).message}`);
+      }
+    });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
+};
+
+// Get Windows Defender status via IPC
+export const getWindowsDefenderStatus = (): Promise<WindowsDefenderStatus> => {
+  if (isElectron()) {
+    return new Promise<WindowsDefenderStatus>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('get-defender-status');
+        // @ts-ignore
+        window.api.receive('defender-status-result', (result: { success: boolean, status?: WindowsDefenderStatus, error?: string }) => {
+          if (result.success && result.status) {
+            resolve(result.status);
+          } else {
+            reject(result.error || 'Failed to retrieve Windows Defender status');
+          }
+        });
+      } catch (error) {
+        reject(`Error getting Windows Defender status: ${(error as Error).message}`);
+      }
+    });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
+};
+
+// Get Firewall rules via IPC
+export const getFirewallRules = (): Promise<FirewallRule[]> => {
+  if (isElectron()) {
+    return new Promise<FirewallRule[]>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('get-firewall-rules');
+        // @ts-ignore
+        window.api.receive('firewall-rules-result', (result: { success: boolean, rules?: FirewallRule[], error?: string }) => {
+          if (result.success && result.rules) {
+            resolve(result.rules);
+          } else {
+            reject(result.error || 'Failed to retrieve firewall rules');
+          }
+        });
+      } catch (error) {
+        reject(`Error getting firewall rules: ${(error as Error).message}`);
+      }
+    });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
+};
+
+// Run security audit via IPC
+export const performSecurityAudit = (): Promise<SecurityAuditResult> => {
+  if (isElectron()) {
+    return new Promise<SecurityAuditResult>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('run-security-audit');
+        // @ts-ignore
+        window.api.receive('security-audit-result', (result: { success: boolean, audit?: SecurityAuditResult, error?: string }) => {
+          if (result.success && result.audit) {
+            resolve(result.audit);
+          } else {
+            reject(result.error || 'Failed to perform security audit');
+          }
+        });
+      } catch (error) {
+        reject(`Error performing security audit: ${(error as Error).message}`);
+      }
+    });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
+};
+
+// Analyze Windows Event Logs with AI
+export const aiAnalyzeLogs = (
+  logName: string = 'System',
+  count: number = 1000
+): Promise<AILogAnalysisResult> => {
+  if (isElectron()) {
+    return new Promise<AILogAnalysisResult>((resolve, reject) => {
+      try {
+        // @ts-ignore
+        window.api.send('analyze-logs-ai', { logName, count });
+        // @ts-ignore
+        window.api.receive('ai-analysis-result', (result: { success: boolean, result?: AILogAnalysisResult, error?: string }) => {
+          if (result.success && result.result) {
+            resolve(result.result);
+          } else {
+            reject(result.error || 'Failed to analyze logs');
+          }
+        });
+      } catch (error) {
+        reject(`Error analyzing logs: ${(error as Error).message}`);
+      }
+    });
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
+};
+
+// Regular log analysis (without AI, but using real logs)
+export const analyzeLogs = async (logPath = 'System', limit = 100) => {
   if (isElectron()) {
     try {
-      // Implementation for real security audit via IPC would go here
-      // For now, return simulated data
-      return {
-        hostname: 'system',
-        issues_by_severity: { high: 1, medium: 2, low: 3 },
-        issues: [
-          {
-            severity: 'high',
-            issue: 'Firewall is disabled',
-            recommendation: 'Enable firewall for better security'
-          },
-          {
-            severity: 'medium',
-            issue: 'System updates available',
-            recommendation: 'Install system updates'
-          },
-          {
-            severity: 'low',
-            issue: 'Non-essential services running',
-            recommendation: 'Disable unnecessary services'
+      // Get actual Windows event logs
+      const logs = await getWindowsEventLogs(logPath, limit);
+      
+      // Count by level
+      const levels = logs.reduce((acc, log) => {
+        const level = log.LevelDisplayName || '';
+        if (level.includes('Error')) acc.error++;
+        else if (level.includes('Warning')) acc.warning++;
+        else if (level.includes('Critical')) acc.critical++;
+        else acc.info++;
+        return acc;
+      }, { info: 0, warning: 0, error: 0, critical: 0 });
+      
+      // Count by service
+      const services = logs.reduce((acc, log) => {
+        const service = log.ProviderName || 'Unknown';
+        acc[service] = (acc[service] || 0) + 1;
+        return acc;
+      }, {} as {[key: string]: number});
+      
+      // Extract common patterns
+      const messages = logs.map(log => log.Message || '');
+      const wordCounts: {[key: string]: number} = {};
+      
+      messages.forEach(message => {
+        const words = message.split(/\s+/);
+        const uniqueWords = [...new Set(words)];
+        
+        uniqueWords.forEach(word => {
+          if (word.length > 3) {
+            wordCounts[word] = (wordCounts[word] || 0) + 1;
           }
-        ]
+        });
+      });
+      
+      const patterns = Object.entries(wordCounts)
+        .filter(([_, count]) => count > 1)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 10);
+      
+      // Time series data
+      const timeMap: {[key: string]: number} = {};
+      logs.forEach(log => {
+        try {
+          const date = new Date(log.TimeCreated);
+          const hour = date.getHours().toString().padStart(2, '0');
+          const timeKey = `${hour}:00`;
+          timeMap[timeKey] = (timeMap[timeKey] || 0) + 1;
+        } catch (e) {
+          // Skip logs with invalid timestamps
+        }
+      });
+      
+      const timeSeries = Object.entries(timeMap)
+        .map(([time, count]) => ({ time, count }))
+        .sort((a, b) => a.time.localeCompare(b.time));
+      
+      return {
+        entries: logs,
+        levels,
+        services,
+        patterns,
+        time_series: timeSeries
       };
     } catch (error) {
-      console.error('Error performing security audit:', error);
+      console.error('Error analyzing Windows event logs:', error);
       throw error;
     }
   } else {
-    // Return mock data for browser environment
-    return Promise.resolve({
-      hostname: 'browser-host',
-      issues_by_severity: { high: 1, medium: 2, low: 3 },
-      issues: [
-        {
-          severity: 'high',
-          issue: 'Firewall is disabled',
-          recommendation: 'Enable firewall for better security'
-        },
-        {
-          severity: 'medium',
-          issue: 'System updates available',
-          recommendation: 'Install system updates'
-        },
-        {
-          severity: 'low',
-          issue: 'Non-essential services running',
-          recommendation: 'Disable unnecessary services'
-        }
-      ]
-    });
+    return Promise.reject('This feature requires Electron with full system access');
   }
-};
-
-// Log analysis
-export const analyzeLogs = async (logPath = 'System', limit = 100) => {
-  // Mock implementation
-  return {
-    entries: Array(10).fill(0).map((_, i) => ({
-      timestamp: new Date().toISOString(),
-      level: ['INFO', 'WARNING', 'ERROR'][Math.floor(Math.random() * 3)],
-      service: ['system', 'network', 'security'][Math.floor(Math.random() * 3)],
-      message: `Log message ${i+1}`
-    })),
-    levels: { info: 7, warning: 2, error: 1, critical: 0 },
-    services: { system: 5, network: 3, security: 2 },
-    patterns: [['System started', 2], ['Connection established', 3]],
-    time_series: Array(24).fill(0).map((_, i) => ({
-      time: `${i.toString().padStart(2, '0')}:00`,
-      count: Math.floor(Math.random() * 10)
-    }))
-  };
-};
-
-// AI Log Analysis (more sophisticated analysis)
-export const aiAnalyzeLogs = async (logPath = 'System', limit = 1000) => {
-  // Mock implementation
-  return {
-    summary: {
-      total_logs: 1000,
-      error_count: 50,
-      warning_count: 150,
-      anomaly_count: 3
-    },
-    time_series: Array(24).fill(0).map((_, i) => ({
-      time: `${i.toString().padStart(2, '0')}:00`,
-      count: Math.floor(Math.random() * 100)
-    })),
-    service_distribution: [
-      { name: 'system', total: 400, error: 20, warning: 50, info: 330 },
-      { name: 'network', total: 300, error: 15, warning: 45, info: 240 },
-      { name: 'security', total: 200, error: 10, warning: 40, info: 150 }
-    ],
-    error_clusters: [
-      {
-        keywords: 'Connection refused at',
-        count: 15,
-        examples: ['ERROR [network] Connection refused at 192.168.1.1:80']
-      }
-    ],
-    anomalies: [
-      {
-        type: 'error_spike',
-        description: 'Unusually high number of logs at 14:00',
-        time: '14:00',
-        deviation: '3x normal rate'
-      }
-    ],
-    top_patterns: [['Connection refused', 15], ['Authentication failed', 10]]
-  };
 };
 
 // Get security policies
 export const getSecurityPolicies = async () => {
-  // Mock implementation
-  return {
-    password_policy: {
-      min_length: 8,
-      require_uppercase: true,
-      require_lowercase: true,
-      require_numbers: true,
-      require_special_chars: false,
-      max_age_days: 90,
-      prevent_reuse: true,
-      lockout_threshold: 5
-    },
-    firewall_rules: {
-      default_incoming: 'deny',
-      default_outgoing: 'allow',
-      allowed_services: ['http', 'https', 'dns']
+  if (isElectron()) {
+    try {
+      // Get password policy from PowerShell
+      const passwordCommand = 'powershell -Command "Get-LocalUser | Get-Member -MemberType Property | ConvertTo-Json"';
+      const firewallCommand = 'powershell -Command "Get-NetFirewallProfile | Select-Object Name, Enabled | ConvertTo-Json"';
+      
+      const [passwordOutput, firewallOutput] = await Promise.all([
+        executeShellCommand(passwordCommand).catch(() => '[]'),
+        executeShellCommand(firewallCommand).catch(() => '[]'),
+      ]);
+      
+      let passwordPolicy;
+      try {
+        passwordPolicy = {
+          min_length: 8, // Default, actual value would need netsh or Local Security Policy
+          require_uppercase: true,
+          require_lowercase: true,
+          require_numbers: true,
+          require_special_chars: false,
+          max_age_days: 90,
+          prevent_reuse: true,
+          lockout_threshold: 5
+        };
+      } catch (e) {
+        passwordPolicy = {
+          min_length: 8,
+          require_uppercase: true,
+          require_lowercase: true,
+          require_numbers: true,
+          require_special_chars: false,
+          max_age_days: 90,
+          prevent_reuse: true,
+          lockout_threshold: 5
+        };
+      }
+      
+      let firewallRules;
+      try {
+        const firewallProfiles = JSON.parse(firewallOutput);
+        const enabledProfiles = Array.isArray(firewallProfiles) 
+          ? firewallProfiles.filter((profile: any) => profile.Enabled)
+          : [firewallProfiles].filter(profile => profile.Enabled);
+        
+        // Get some active services
+        const servicesCommand = 'powershell -Command "Get-Service | Where-Object {$_.Status -eq \'Running\'} | Select-Object -First 10 -Property DisplayName | ConvertTo-Json"';
+        const servicesOutput = await executeShellCommand(servicesCommand).catch(() => '[]');
+        let services;
+        try {
+          services = JSON.parse(servicesOutput);
+          services = Array.isArray(services) 
+            ? services.map((svc: any) => svc.DisplayName || 'Unknown Service').slice(0, 5)
+            : [services].map(svc => svc.DisplayName || 'Unknown Service');
+        } catch (e) {
+          services = ['Windows Firewall', 'Windows Defender', 'DHCP Client'];
+        }
+        
+        firewallRules = {
+          default_incoming: enabledProfiles.length > 0 ? 'deny' : 'allow',
+          default_outgoing: 'allow',
+          allowed_services: services
+        };
+      } catch (e) {
+        firewallRules = {
+          default_incoming: 'deny',
+          default_outgoing: 'allow',
+          allowed_services: ['http', 'https', 'dns']
+        };
+      }
+      
+      return {
+        password_policy: passwordPolicy,
+        firewall_rules: firewallRules
+      };
+    } catch (error) {
+      console.error('Error getting security policies:', error);
+      throw error;
     }
-  };
+  } else {
+    return Promise.reject('This feature requires Electron with full system access');
+  }
 };

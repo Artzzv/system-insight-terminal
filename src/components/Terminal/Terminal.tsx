@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import TerminalHeader from './TerminalHeader';
@@ -30,7 +31,8 @@ const Terminal: React.FC<TerminalProps> = ({
   // Common commands for autocompletion
   const commonCommands = [
     'help', 'clear', 'network-check', 'system-health', 'audit', 
-    'show-policies', 'analyze-logs', 'ai-analyze-logs', 'exit', 'ls', 'cd', 'pwd',
+    'show-policies', 'show-defender', 'show-firewall', 'analyze-logs', 'ai-analyze-logs', 
+    'event-logs', 'exit', 'ls', 'cd', 'pwd',
     'ifconfig', 'ipconfig', 'ping', 'traceroute', 'netstat', 'arp',
     'ps', 'top', 'htop', 'df', 'du', 'free',
     'cat', 'grep', 'find', 'chmod', 'chown', 'history'
@@ -120,12 +122,13 @@ const Terminal: React.FC<TerminalProps> = ({
   // Start with welcome message
   useEffect(() => {
     if (outputLines.length === 0) {
-      addOutputLine(`Welcome to System Insight Terminal v1.2.0`, 'info');
+      addOutputLine(`Welcome to Advanced System Insight Terminal v2.0.0`, 'info');
       if (!isElectron()) {
-        addOutputLine(`WARNING: Running in browser mode. System commands will not work.`, 'warning');
-        addOutputLine(`Please run using Electron for full functionality.`, 'warning');
+        addOutputLine(`WARNING: Running in browser mode. Please run using Electron app for real system data access.`, 'error');
+        addOutputLine(`All system monitoring features require the Electron environment.`, 'warning');
       } else {
-        addOutputLine(`Running in Electron mode with full system access.`, 'success');
+        addOutputLine(`Running with full system access. All monitoring features are available.`, 'success');
+        addOutputLine(`Log analysis is powered by AI/ML unsupervised learning algorithms.`, 'info');
       }
       addOutputLine(`Type 'help' to see available commands`, 'info');
       addOutputLine('', 'standard');
