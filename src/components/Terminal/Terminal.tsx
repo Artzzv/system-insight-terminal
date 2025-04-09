@@ -6,6 +6,7 @@ import TerminalOutput, { TerminalOutputLine, OutputType } from './TerminalOutput
 import TerminalInput from './TerminalInput';
 import { executeCommand } from '@/utils/commandHandler';
 import { Separator } from '@/components/ui/separator';
+import { isElectron } from '@/utils/systemInfo';
 
 interface TerminalProps {
   title?: string;
@@ -121,8 +122,12 @@ const Terminal: React.FC<TerminalProps> = ({
   useEffect(() => {
     if (outputLines.length === 0) {
       addOutputLine(`Welcome to System Insight Terminal v1.2.0`, 'info');
-      addOutputLine(`NOTE: Running in browser mode with simulated system data.`, 'warning');
-      addOutputLine(`Real-time system monitoring is available in Electron app mode.`, 'info');
+      if (!isElectron()) {
+        addOutputLine(`WARNING: Running in browser mode. System commands will not work.`, 'warning');
+        addOutputLine(`Please run using Electron for full functionality.`, 'warning');
+      } else {
+        addOutputLine(`Running in Electron mode with full system access.`, 'success');
+      }
       addOutputLine(`Type 'help' to see available commands`, 'info');
       addOutputLine('', 'standard');
     }

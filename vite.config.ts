@@ -32,4 +32,8 @@ export default defineConfig(({ mode }) => ({
       ]
     }
   },
+  // Disable ESLint for faster build
+  optimizeDeps: {
+    exclude: ['electron'],
+  },
 }));
